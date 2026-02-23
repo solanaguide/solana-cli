@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "solanaguide-solana-cli",
+  "description": "Solana CLI tools for payments, trading, staking, lending, and portfolio tracking",
+  "owner": {
+    "name": "solanaguide",
+    "email": "support@solanacompass.com"
+  },
+  "plugins": [
+    {
+      "name": "solana-payments-wallets-trading",
+      "description": "Pay people in SOL or USDC, buy and sell tokens, manage wallets, stake, lend, and track your Solana portfolio. No API keys needed.",
+      "version": "0.2.1",
+      "author": {
+        "name": "solanaguide"
+      },
+      "source": ".",
+      "category": "productivity"
+    }
+  ]
+}
