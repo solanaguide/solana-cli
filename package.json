@@ -1,5 +1,5 @@
 {
-  "name": "sol-cli",
+  "name": "@solana-compass/cli",
   "version": "0.1.0",
   "description": "Solana CLI for Humans and LLM Agents",
   "type": "module",

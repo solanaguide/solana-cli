@@ -18,7 +18,7 @@ Every command supports `--json` for machine-readable output:
 
 ```bash
 # One-liner (requires Node.js >= 20)
-npx sol-cli wallet list
+npx @solana-compass/cli wallet list
 
 # Or clone and run directly
 git clone <repo> && cd sol
