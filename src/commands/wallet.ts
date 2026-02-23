@@ -58,23 +58,41 @@ export function registerWalletCommand(program: Command): void {
       try {
         const wallets = walletManager.listWallets(opts.label);
 
+        if (wallets.length === 0) {
+          if (isJsonMode()) {
+            output(success([]));
+          } else {
+            console.log('No wallets found. Create one with: sol wallet create');
+          }
+          return;
+        }
+
+        // Fetch SOL balances in parallel
+        const balances = await Promise.all(
+          wallets.map(w => getSolBalance(w.address).catch(() => null))
+        );
+
         if (isJsonMode()) {
-          output(success(wallets));
-        } else if (wallets.length === 0) {
-          console.log('No wallets found. Create one with: sol wallet create');
+          output(success(wallets.map((w, i) => ({
+            ...w,
+            solBalance: balances[i],
+          }))));
         } else {
           console.log(table(
-            wallets.map(w => ({
+            wallets.map((w, i) => ({
               name: w.name,
               address: w.address,
+              sol: balances[i] !== null ? `${balances[i]!.toFixed(4)} SOL` : '—',
               labels: w.labels.join(', ') || '—',
             })),
             [
               { key: 'name', header: 'Name' },
               { key: 'address', header: 'Address' },
+              { key: 'sol', header: 'SOL', align: 'right' },
               { key: 'labels', header: 'Labels' },
             ]
           ));
+          console.log('\nRun `sol wallet balance` for full token balances and USD values.');
         }
       } catch (err: any) {
         output(failure('WALLET_LIST_FAILED', err.message));

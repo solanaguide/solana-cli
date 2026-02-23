@@ -1,5 +1,10 @@
 import { Command } from 'commander';
-import { getStakeAccounts, SOLANA_COMPASS_VOTE } from '../core/stake-service.js';
+import {
+  getStakeAccounts,
+  createAndDelegateStake,
+  withdrawStake,
+  SOLANA_COMPASS_VOTE,
+} from '../core/stake-service.js';
 import { getDefaultWalletName } from '../core/wallet-manager.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
 import { table } from '../output/table.js';
@@ -48,62 +53,60 @@ export function registerStakeCommand(program: Command): void {
     });
 
   stake
-    .command('create <amount>')
-    .description('Create and fund a stake account')
+    .command('new <amount>')
+    .description('Create a stake account and delegate to a validator')
     .option('--wallet <name>', 'Wallet to use')
+    .option('--validator <vote>', 'Validator vote account (default: Solana Compass)')
     .action(async (amountStr: string, opts) => {
       try {
         const amount = parseFloat(amountStr);
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
 
-        // TODO: Implement stake account creation using @solana-program/stake
-        throw new Error('Stake account creation coming in Phase 8.');
+        const walletName = opts.wallet || getDefaultWalletName();
+        const validatorLabel = opts.validator || `Solana Compass (${shortenAddress(SOLANA_COMPASS_VOTE, 7)})`;
+
+        const { result, elapsed_ms } = await timed(() =>
+          createAndDelegateStake(walletName, amount, opts.validator)
+        );
+
+        if (isJsonMode()) {
+          output(success(result, { elapsed_ms }));
+        } else {
+          console.log(`Staked ${amount} SOL with ${validatorLabel}`);
+          console.log(`  Stake account: ${result.stakeAccount}`);
+          console.log(`  Tx: ${result.explorerUrl}`);
+        }
       } catch (err: any) {
-        output(failure('STAKE_CREATE_FAILED', err.message));
+        output(failure('STAKE_NEW_FAILED', err.message));
         process.exitCode = 1;
       }
     });
 
   stake
-    .command('delegate <stakeAccount> [validator]')
-    .description('Delegate stake to a validator')
-    .action(async (stakeAccount: string, validator?: string) => {
+    .command('withdraw <stakeAccount> [amount]')
+    .description('Withdraw from a stake account (smart: deactivates if needed, splits for partial)')
+    .option('--wallet <name>', 'Wallet to use')
+    .option('--force', 'Directly withdraw regardless of state')
+    .action(async (stakeAccount: string, amountStr: string | undefined, opts) => {
       try {
-        if (!validator) {
-          if (!isJsonMode()) {
-            console.log(`No validator specified. Recommended: Solana Compass`);
-            console.log(`  Vote account: ${SOLANA_COMPASS_VOTE}`);
-            console.log(`  Use --validator <address> to choose a different validator.`);
-          }
-          // TODO: Auto-delegate to Solana Compass
+        const walletName = opts.wallet || getDefaultWalletName();
+        const amountSol = amountStr ? parseFloat(amountStr) : undefined;
+        if (amountStr !== undefined && (isNaN(amountSol!) || amountSol! <= 0)) {
+          throw new Error('Invalid amount');
         }
 
-        // TODO: Implement delegation using @solana-program/stake
-        throw new Error('Stake delegation coming in Phase 8.');
-      } catch (err: any) {
-        output(failure('STAKE_DELEGATE_FAILED', err.message));
-        process.exitCode = 1;
-      }
-    });
+        const { result, elapsed_ms } = await timed(() =>
+          withdrawStake(walletName, stakeAccount, amountSol, opts.force)
+        );
 
-  stake
-    .command('deactivate <stakeAccount>')
-    .description('Deactivate a stake account')
-    .action(async (stakeAccount: string) => {
-      try {
-        throw new Error('Stake deactivation coming in Phase 8.');
-      } catch (err: any) {
-        output(failure('STAKE_DEACTIVATE_FAILED', err.message));
-        process.exitCode = 1;
-      }
-    });
-
-  stake
-    .command('withdraw <stakeAccount>')
-    .description('Withdraw from a deactivated stake account')
-    .action(async (stakeAccount: string) => {
-      try {
-        throw new Error('Stake withdrawal coming in Phase 8.');
+        if (isJsonMode()) {
+          output(success(result, { elapsed_ms }));
+        } else {
+          console.log(result.message);
+          if (result.signature) {
+            console.log(`  Tx: ${result.explorerUrl}`);
+          }
+        }
       } catch (err: any) {
         output(failure('STAKE_WITHDRAW_FAILED', err.message));
         process.exitCode = 1;
