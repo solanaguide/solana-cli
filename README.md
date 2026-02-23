@@ -312,6 +312,10 @@ src/
 - All transactions are logged to SQLite for audit
 - Swap/send commands show details and prompt before executing (unless `--yes`)
 
+## Disclaimer
+
+This software interacts with the Solana blockchain and can execute irreversible transactions involving real funds. You are solely responsible for your own transactions, wallet security, and any financial outcomes. The authors are not liable for any losses. Use at your own risk.
+
 ## License
 
 MIT
