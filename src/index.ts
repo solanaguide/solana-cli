@@ -16,7 +16,7 @@ const program = new Command();
 program
   .name('sol')
   .description('Solana CLI for Humans and LLM Agents')
-  .version('0.1.0')
+  .version('0.2.0')
   .option('--json', 'Output structured JSON')
   .option('--rpc <url>', 'Override RPC endpoint')
   .option('--verbose', 'Verbose output')
