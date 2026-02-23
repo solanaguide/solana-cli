@@ -90,6 +90,7 @@ sol token price sol usdc bonk eth       # multiple at once
 
 ```bash
 sol wallet balance                      # all tokens with USD values
+sol wallet balance trading              # specific wallet by name
 sol token list                          # just token balances
 sol wallet list                         # all your wallets
 ```

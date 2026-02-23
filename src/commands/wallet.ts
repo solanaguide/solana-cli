@@ -125,10 +125,12 @@ export function registerWalletCommand(program: Command): void {
   wallet
     .command('balance [name]')
     .description('Show wallet balance (all tokens + USD value)')
-    .action(async (name?: string) => {
+    .option('--wallet <name>', 'Wallet to check')
+    .action(async (name?: string, opts?: any) => {
       try {
         const { result: data, elapsed_ms } = await timed(async () => {
-          const walletName = name ? walletManager.resolveWalletName(name) : walletManager.getDefaultWalletName();
+          const pick = opts?.wallet || name;
+          const walletName = pick ? walletManager.resolveWalletName(pick) : walletManager.getDefaultWalletName();
           const wallet = walletRepo.getWallet(walletName)!;
 
           const balances = await getTokenBalances(wallet.address);
@@ -285,9 +287,11 @@ export function registerWalletCommand(program: Command): void {
     .description('Generate fiat onramp payment URL')
     .option('--amount <usd>', 'Prefill USD amount', parseFloat)
     .option('--provider <name>', 'Onramp provider (transak, sphere)')
+    .option('--wallet <name>', 'Wallet to fund')
     .action(async (name?: string, opts?: any) => {
       try {
-        const walletName = name ? walletManager.resolveWalletName(name) : walletManager.getDefaultWalletName();
+        const pick = opts?.wallet || name;
+        const walletName = pick ? walletManager.resolveWalletName(pick) : walletManager.getDefaultWalletName();
         const wallet = walletRepo.getWallet(walletName)!;
 
         const url = getOnrampUrl({
@@ -314,9 +318,11 @@ export function registerWalletCommand(program: Command): void {
     .description('Show recent transaction activity')
     .option('--limit <n>', 'Number of transactions to show', parseInt, 20)
     .option('--type <type>', 'Filter by type (transfer, swap)')
+    .option('--wallet <name>', 'Wallet to check')
     .action(async (name?: string, opts?: any) => {
       try {
-        const walletName = name ? walletManager.resolveWalletName(name) : walletManager.getDefaultWalletName();
+        const pick = opts?.wallet || name;
+        const walletName = pick ? walletManager.resolveWalletName(pick) : walletManager.getDefaultWalletName();
 
         const txs = txRepo.getRecentTransactions({
           walletName,

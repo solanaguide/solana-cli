@@ -104,14 +104,16 @@ sol wallet fund trading --provider moonpay
 Generates a URL to purchase SOL via a fiat onramp provider. Opens
 in your browser.
 
-## Global Wallet Flag
+## Wallet Flag
 
-Any command that operates on a wallet accepts `--wallet <name-or-address>`:
+Any command accepts `--wallet <name>` to override the default wallet:
 
 ```bash
+sol wallet balance --wallet trading
 sol token swap 50 usdc bonk --wallet trading
 sol stake new 10 --wallet cold
 sol lend deposit 100 usdc --wallet defi
+sol portfolio --wallet trading
 ```
 
 ## JSON Output

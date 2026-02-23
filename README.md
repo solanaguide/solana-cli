@@ -48,8 +48,9 @@ Requires Node.js >= 20.
 Sol CLI is available as a discoverable skill for Claude Code and other LLM agents:
 
 ```bash
-# Claude Code plugin marketplace
+# Claude Code — add the marketplace, then install the plugin
 /plugin marketplace add solanaguide/solana-cli
+/plugin install solana-payments-wallets-trading@solanaguide-solana-cli
 
 # skills.sh
 npx skills add solanaguide/solana-cli
