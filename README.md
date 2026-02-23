@@ -1,37 +1,31 @@
 # sol — Solana for Humans and LLM Agents
 
-A Solana CLI that reads like English. Every command has structured `--json` output so LLM agents like Claude Code can drive it programmatically — managing wallets, executing swaps, staking, lending, and tracking portfolios without ever touching raw transactions.
+A command-line tool that lets you work with Solana the way you'd describe it out loud. Pay people, buy and sell tokens, stake, lend, and track your portfolio — instead of constructing transactions and managing program instructions, you say what you want. Keys live locally on disk. No API keys, no private key env vars.
 
 ```bash
-sol token swap 50 usdc bonk          # Swap via Jupiter
-sol stake new 10                      # Stake SOL in one command
-sol lend deposit 100 usdc             # Earn yield on Kamino
-sol portfolio                         # See everything you hold
+# Set up
+sol wallet create --name "ClawdBot"
+
+# Transfer some SOL to the agent wallet, then:
+
+# Check balance
+sol wallet balance
+
+# Swap 50 USDC for BONK
+sol token swap 50 usdc bonk
+
+# Stake idle SOL
+sol stake new 10
+
+# Deposit USDC to earn yield on Kamino
+sol lend deposit 100 usdc
+
+# See everything you hold
+sol portfolio
+
+# Snapshot for tracking over time
+sol portfolio snapshot --label "post-rebalance"
 ```
-
----
-
-## Why This Exists
-
-Solana has great infrastructure but terrible UX for automation. An LLM agent that wants to "swap 50 USDC for BONK" shouldn't need to construct transaction messages, manage blockhashes, or parse binary account data. **sol** wraps all of that behind natural-language commands with structured JSON responses:
-
-```bash
-$ sol token swap 50 usdc bonk --json
-{
-  "ok": true,
-  "data": {
-    "inputToken": "USDC",
-    "outputToken": "BONK",
-    "inputAmount": 50,
-    "outputAmount": 3842519.52,
-    "signature": "4xK9...",
-    "explorerUrl": "https://solscan.io/tx/4xK9..."
-  },
-  "meta": { "elapsed_ms": 1823 }
-}
-```
-
-No API keys required. No SDK integration. Just commands and JSON.
 
 ---
 
@@ -48,6 +42,20 @@ npx @solana-compass/cli wallet list
 ```
 
 Requires Node.js >= 20.
+
+### Install as an Agent Skill
+
+Sol CLI is available as a discoverable skill for Claude Code and other LLM agents:
+
+```bash
+# Claude Code plugin marketplace
+/plugin marketplace add solanaguide/solana-cli
+
+# skills.sh
+npx skills add solanaguide/solana-cli
+```
+
+Once installed, the agent can use Sol commands directly when you ask it to send crypto, trade tokens, check balances, stake, lend, or track portfolio performance.
 
 ### First-time setup
 
@@ -80,7 +88,6 @@ sol wallet set-default trading                 # Change the active wallet
 sol wallet label main --add trading           # Tag wallets for organization
 sol wallet history                            # Recent transaction activity
 sol wallet history --type swap --limit 5      # Filtered
-sol wallet fund --amount 100                  # Generate fiat onramp URL (Transak)
 ```
 
 Wallets are stored locally as key files. The first wallet created becomes the default for all commands. Change it with `sol wallet set-default <name>`, or override per-command with `--wallet <name-or-address>`.
@@ -194,11 +201,10 @@ sol tx 4xK9...abc                             # Look up a transaction by signatu
 
 ---
 
-## For LLM Agents
+## Structured Output
 
-Every command supports `--json` for structured output. Responses follow a consistent envelope:
+Every command supports `--json` for automation and scripting:
 
-**Success:**
 ```json
 {
   "ok": true,
@@ -207,50 +213,7 @@ Every command supports `--json` for structured output. Responses follow a consis
 }
 ```
 
-**Error:**
-```json
-{
-  "ok": false,
-  "error": "SWAP_FAILED",
-  "message": "Insufficient SOL balance"
-}
-```
-
-Error codes are predictable `UPPER_SNAKE_CASE` identifiers (`WALLET_CREATE_FAILED`, `LEND_DEPOSIT_FAILED`, etc.). An agent can branch on `ok`, read `data` for results, and use `error` codes for programmatic error handling without parsing human text.
-
-### Agent workflow example
-
-A Claude Code agent managing a DeFi portfolio might run:
-
-```bash
-# 1. Check what we're working with
-sol wallet balance --json
-sol portfolio --json
-
-# 2. Sell some BONK for USDC
-sol token swap 1000000 bonk usdc --json
-
-# 3. Put idle USDC to work earning yield
-sol lend deposit 100 usdc --json
-
-# 4. Stake idle SOL
-sol stake new 5 --json
-
-# 5. Verify final state and snapshot for tracking
-sol portfolio --json
-sol portfolio snapshot --label "rebalanced" --json
-```
-
-Each step returns structured data the agent can parse and act on. No web scraping, no API key management, no transaction construction.
-
-### What agents get for free
-
-- **Wallet management** — Create and fund wallets without touching key files
-- **Token resolution** — Say `sol` or `usdc` instead of mint addresses
-- **Transaction handling** — Automatic retries, blockhash management, confirmation polling
-- **Cost-basis tracking** — Every swap is logged with USD prices at execution time
-- **Portfolio snapshots** — Track P&L across sessions without external databases
-- **Error classification** — Structured errors distinguish transient failures (retry) from terminal ones (stop)
+Error codes are predictable `UPPER_SNAKE_CASE` identifiers (`SWAP_FAILED`, `LEND_DEPOSIT_FAILED`, etc.).
 
 ---
 
@@ -259,11 +222,10 @@ Each step returns structured data the agent can parse and act on. No web scrapin
 | Flag | Description |
 |------|-------------|
 | `--json` | Structured JSON output |
-| `--wallet <name>` | Override default wallet |
 | `--rpc <url>` | Override RPC endpoint |
 | `--verbose` | Show debug logging |
 
-These work on every command: `sol --json --wallet trading token swap 50 usdc bonk`
+Most commands also accept `--wallet <name-or-address>` to override the default wallet.
 
 ## RPC Resolution
 
@@ -291,7 +253,7 @@ The transaction log is the source of truth for cost basis and P&L — every swap
 
 ## Architecture
 
-- **Runtime**: Node.js via `tsx` — no build step needed
+- **Runtime**: Node.js (compiled from TypeScript)
 - **CLI framework**: commander.js
 - **Solana SDK**: `@solana/kit` v2
 - **Swaps**: Jupiter REST API (no SDK, no API key)
