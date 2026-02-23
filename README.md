@@ -100,6 +100,25 @@ sol token close --all --yes                   # Close empty accounts, reclaim re
 
 Swaps use Jupiter's aggregator — best price across all Solana DEXes, no API key needed. Every swap is logged with cost-basis prices for portfolio tracking.
 
+### Token resolution
+
+Anywhere a command takes a token, you can use a **symbol** (`sol`, `usdc`, `bonk`) or a **mint address** (`EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`). Resolution works in three steps:
+
+1. **Hardcoded well-known list** — 15 major tokens (SOL, USDC, USDT, JUP, BONK, mSOL, jitoSOL, bSOL, ETH, wBTC, PYTH, JTO, WEN, RNDR, JLP) resolve instantly offline. These are immune to spoofing.
+
+2. **Local cache** — Previously resolved tokens are cached in SQLite with a 24-hour TTL. Populated by prior lookups and `sol token sync`.
+
+3. **Jupiter Token API** — If not cached, the CLI searches Jupiter's token database. Results are ranked by liquidity and trading volume, so `usdc` returns the real USDC — not a scam token with the same symbol. The result is cached for next time.
+
+**For unfamiliar tokens, verify before transacting:**
+
+```bash
+sol token info peng                           # Check the resolved mint address
+sol token swap 50 usdc EPjFW...1v --quote-only  # Use the mint address directly
+```
+
+Using a mint address bypasses symbol search entirely — useful when you know exactly which token you want, or when dealing with tokens that share a ticker. Agents should prefer mint addresses for safety when operating autonomously.
+
 ### stake — Native SOL staking with MEV compounding
 
 ```bash
