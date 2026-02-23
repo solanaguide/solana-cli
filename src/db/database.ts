@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { join } from 'node:path';
 import { getSolDir, ensureSolDir } from '../core/config-manager.js';
 import { migration001 } from './migrations/001_initial.js';
+import { migration002 } from './migrations/002_tx_prices.js';
 
 const DB_PATH = join(getSolDir(), 'data.db');
 
@@ -33,6 +34,7 @@ interface MigrationRecord {
 
 const migrations: MigrationRecord[] = [
   { id: 1, name: '001_initial', sql: migration001 },
+  { id: 2, name: '002_tx_prices', sql: migration002 },
 ];
 
 function runMigrations(database: Database.Database): void {

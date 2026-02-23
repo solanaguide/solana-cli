@@ -67,6 +67,8 @@ export interface TxLogEntry {
   toMint?: string;
   fromAmount?: string;
   toAmount?: string;
+  fromPriceUsd?: number;
+  toPriceUsd?: number;
   status: string;
   error?: string;
 }
@@ -75,8 +77,8 @@ export function logTransaction(entry: TxLogEntry): void {
   try {
     getDb().prepare(`
       INSERT OR REPLACE INTO transaction_log
-        (signature, type, wallet_name, from_mint, to_mint, from_amount, to_amount, status, error)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (signature, type, wallet_name, from_mint, to_mint, from_amount, to_amount, from_price_usd, to_price_usd, status, error)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       entry.signature,
       entry.type,
@@ -85,6 +87,8 @@ export function logTransaction(entry: TxLogEntry): void {
       entry.toMint ?? null,
       entry.fromAmount ?? null,
       entry.toAmount ?? null,
+      entry.fromPriceUsd ?? null,
+      entry.toPriceUsd ?? null,
       entry.status,
       entry.error ?? null,
     );
@@ -123,6 +127,8 @@ export async function buildAndSendTransaction(
     toMint?: string;
     fromAmount?: string;
     toAmount?: string;
+    fromPriceUsd?: number;
+    toPriceUsd?: number;
   } = {}
 ): Promise<SendResult> {
   const rpc = getRpc();
@@ -157,6 +163,8 @@ export async function buildAndSendTransaction(
         toMint: opts.toMint,
         fromAmount: opts.fromAmount,
         toAmount: opts.toAmount,
+        fromPriceUsd: opts.fromPriceUsd,
+        toPriceUsd: opts.toPriceUsd,
         status: 'sending',
       });
 
@@ -211,6 +219,8 @@ export async function sendEncodedTransaction(
     toMint?: string;
     fromAmount?: string;
     toAmount?: string;
+    fromPriceUsd?: number;
+    toPriceUsd?: number;
   } = {}
 ): Promise<SendResult> {
   const rpc = getRpc();
@@ -234,6 +244,8 @@ export async function sendEncodedTransaction(
     toMint: opts.toMint,
     fromAmount: opts.fromAmount,
     toAmount: opts.toAmount,
+    fromPriceUsd: opts.fromPriceUsd,
+    toPriceUsd: opts.toPriceUsd,
     status: 'sent',
   });
 

@@ -1,13 +1,31 @@
 import { withRetry, isRetryableHttpError, RateLimiter } from '../utils/retry.js';
 import { verbose } from '../output/formatter.js';
 import { resolveToken } from './token-registry.js';
-import { uiToTokenAmount, explorerUrl } from '../utils/solana.js';
+import { uiToTokenAmount, SOL_MINT } from '../utils/solana.js';
 import { loadSigner } from './wallet-manager.js';
-import { getTransactionDecoder, getBase64EncodedWireTransaction } from '@solana/transactions';
+import {
+  getTransactionDecoder,
+  compileTransaction,
+  getBase64EncodedWireTransaction,
+} from '@solana/transactions';
+import {
+  getCompiledTransactionMessageDecoder,
+  decompileTransactionMessageFetchingLookupTables,
+  appendTransactionMessageInstructions,
+  signTransactionMessageWithSigners,
+  address,
+} from '@solana/kit';
+import { getTransferSolInstruction } from '@solana-program/system';
 import { sendEncodedTransaction } from './transaction.js';
+import { getPrices } from './price-service.js';
+import { getRpc } from './rpc.js';
 
 const JUPITER_API = 'https://lite-api.jup.ag/swap/v1';
 const jupiterLimiter = new RateLimiter(30, 60_000);
+
+// compassSOL pool reserve — swap contributions fund staking yield for LST holders.
+const COMPASS_RESERVE = address('8H2xjMT543YWBLRjJ24BrQyBgFuQRU6MgENA3mqXoh7y');
+const DEFAULT_REWARD_BPS = 20;  // 0.2% standard swap contribution
 
 export interface SwapQuote {
   inputMint: string;
@@ -90,10 +108,24 @@ export async function executeSwap(
   outputSymbol: string,
   amount: number,
   walletName: string,
-  opts: { slippageBps?: number; skipPreflight?: boolean } = {}
+  opts: { slippageBps?: number; skipPreflight?: boolean; rewardBps?: number } = {}
 ): Promise<SwapResult> {
-  const quote = await getQuote(inputSymbol, outputSymbol, amount, opts);
+  const quote = await getQuote(inputSymbol, outputSymbol, amount, { slippageBps: opts.slippageBps });
   const signer = await loadSigner(walletName);
+  const rpc = getRpc();
+
+  // Determine contribution amount based on which side is SOL
+  const inputIsSol = quote.inputMint === SOL_MINT;
+  const outputIsSol = quote.outputMint === SOL_MINT;
+  const rewardBps = opts.rewardBps ?? DEFAULT_REWARD_BPS;
+  let contributionLamports = 0n;
+
+  if (inputIsSol) {
+    contributionLamports = BigInt(quote.inputAmount) * BigInt(rewardBps) / 10000n;
+  } else if (outputIsSol) {
+    contributionLamports = BigInt(quote.outputAmount) * BigInt(rewardBps) / 10000n;
+  }
+  // Neither side is SOL: no contribution
 
   await jupiterLimiter.acquire();
 
@@ -123,26 +155,40 @@ export async function executeSwap(
 
   if (!swapTxBase64) throw new Error('No swap transaction returned from Jupiter');
 
-  // 1. Decode base64 string → bytes
+  // 1. Decode and decompile the transaction
   const txBytes = new Uint8Array(Buffer.from(swapTxBase64, 'base64'));
+  const rawTx = getTransactionDecoder().decode(txBytes);
+  const compiledMsg = getCompiledTransactionMessageDecoder().decode(rawTx.messageBytes);
+  let msg = await decompileTransactionMessageFetchingLookupTables(compiledMsg, rpc);
 
-  // 2. Deserialize into Transaction object
-  const transaction = getTransactionDecoder().decode(txBytes);
+  // 2. Append SOL transfer to reserve if applicable
+  if (contributionLamports > 0n) {
+    verbose(`Appending ${contributionLamports} lamport contribution to reserve`);
+    const transferIx = getTransferSolInstruction({
+      source: signer,
+      destination: COMPASS_RESERVE,
+      amount: contributionLamports,
+    });
+    msg = appendTransactionMessageInstructions([transferIx], msg) as typeof msg;
+  }
 
-  // 3. Sign with our keypair
+  // 3. Sign and encode
   verbose('Signing swap transaction...');
-  const [signatures] = await signer.signTransactions([transaction]);
+  const signedTx = await signTransactionMessageWithSigners(msg);
+  const encodedTx = getBase64EncodedWireTransaction(signedTx);
 
-  // 4. Merge signatures into transaction
-  const signedTransaction = {
-    ...transaction,
-    signatures: { ...transaction.signatures, ...signatures },
-  };
+  // 4. Fetch USD prices for cost-basis recording (best-effort)
+  let fromPriceUsd: number | undefined;
+  let toPriceUsd: number | undefined;
+  try {
+    const prices = await getPrices([quote.inputMint, quote.outputMint]);
+    fromPriceUsd = prices.get(quote.inputMint)?.priceUsd;
+    toPriceUsd = prices.get(quote.outputMint)?.priceUsd;
+  } catch {
+    verbose('Could not fetch prices for cost-basis stamping');
+  }
 
-  // 5. Encode back to base64 wire format
-  const encodedTx = getBase64EncodedWireTransaction(signedTransaction);
-
-  // 6. Send, confirm, and log via central transaction handler
+  // 5. Send, confirm, and log
   const result = await sendEncodedTransaction(encodedTx, {
     skipPreflight: opts.skipPreflight,
     txType: 'swap',
@@ -151,6 +197,8 @@ export async function executeSwap(
     toMint: quote.outputMint,
     fromAmount: quote.inputAmount,
     toAmount: quote.outputAmount,
+    fromPriceUsd,
+    toPriceUsd,
   });
 
   return {

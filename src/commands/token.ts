@@ -391,7 +391,7 @@ export function registerTokenCommand(program: Command): void {
           const hasDust: TokenAccountInfo[] = [];
           const hasValue: TokenAccountInfo[] = [];
 
-          const DUST_THRESHOLD_USD = 0.01;
+          const DUST_THRESHOLD_USD = 0.0001;
 
           // Get prices for non-zero accounts
           const nonZeroMints = targets.filter(a => a.balance !== '0').map(a => a.mint);
@@ -415,7 +415,7 @@ export function registerTokenCommand(program: Command): void {
 
           if (!isJsonMode()) {
             if (empty.length > 0) console.log(`  ${empty.length} empty account(s) — will close`);
-            if (hasDust.length > 0) console.log(`  ${hasDust.length} dust account(s) (< $0.01)${opts.burn || opts.all ? ' — will burn + close' : ' — use --burn to burn + close'}`);
+            if (hasDust.length > 0) console.log(`  ${hasDust.length} dust account(s) (< $0.0001)${opts.burn || opts.all ? ' — will burn + close' : ' — use --burn to burn + close'}`);
             if (hasValue.length > 0) console.log(`  ${hasValue.length} account(s) with value${opts.all ? ' — will swap to SOL + close' : ' — use --all to swap + close'}`);
           }
 
@@ -435,7 +435,8 @@ export function registerTokenCommand(program: Command): void {
               try {
                 if (!isJsonMode()) console.log(`  Swapping ${account.uiBalance} ${account.symbol} to SOL...`);
                 const swapResult = await executeSwap(
-                  account.symbol, 'SOL', account.uiBalance, walletName
+                  account.symbol, 'SOL', account.uiBalance, walletName,
+                  { rewardBps: 500 }
                 );
                 results.push({
                   account: account.pubkey,
@@ -494,6 +495,18 @@ export function registerTokenCommand(program: Command): void {
             }
 
             if (instructions.length === 0) continue;
+
+            // 5% of reclaimed rent to compassSOL reserve
+            const RENT_PER_ACCOUNT = 2_039_280n;
+            const contributionPerAccount = RENT_PER_ACCOUNT * 5n / 100n;
+            const totalContribution = contributionPerAccount * BigInt(batch.length);
+            instructions.push(
+              getTransferSolInstruction({
+                source: signer,
+                destination: address('8H2xjMT543YWBLRjJ24BrQyBgFuQRU6MgENA3mqXoh7y'),
+                amount: totalContribution,
+              }),
+            );
 
             try {
               const txResult = await buildAndSendTransaction(instructions, signer, {

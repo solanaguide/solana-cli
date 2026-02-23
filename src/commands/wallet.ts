@@ -3,7 +3,7 @@ import * as walletManager from '../core/wallet-manager.js';
 import { getSolBalance, getTokenBalances } from '../core/token-service.js';
 import { getPrices } from '../core/price-service.js';
 import { getOnrampUrl } from '../core/onramp-service.js';
-import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
+import { output, success, failure, isJsonMode, timed, fmtPrice } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
 import * as txRepo from '../db/repos/transaction-repo.js';
@@ -143,7 +143,7 @@ export function registerWalletCommand(program: Command): void {
             data.tokens.map(t => ({
               symbol: t.symbol,
               balance: t.balance.toFixed(6),
-              price: t.priceUsd !== null ? `$${t.priceUsd.toFixed(4)}` : '—',
+              price: t.priceUsd !== null ? `$${fmtPrice(t.priceUsd)}` : '—',
               value: t.valueUsd !== null ? `$${t.valueUsd.toFixed(2)}` : '—',
             })),
             [

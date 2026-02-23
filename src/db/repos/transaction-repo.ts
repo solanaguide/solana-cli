@@ -9,6 +9,8 @@ export interface TransactionRow {
   to_mint: string | null;
   from_amount: string | null;
   to_amount: string | null;
+  from_price_usd: number | null;
+  to_price_usd: number | null;
   status: string;
   error: string | null;
   created_at: string;
