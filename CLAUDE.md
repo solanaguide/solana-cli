@@ -9,8 +9,8 @@ A Solana CLI that reads like English: `sol token swap 50 usdc bonk`, `sol stake 
 ### Natural language commands
 Commands should read like what you'd say out loud. Prefer `sol token swap 50 usdc bonk` over `sol swap --from usdc --to bonk --amount 50`. Positional args for the common case, flags for overrides.
 
-### Fewer transactions, less friction
-Batch multiple on-chain steps into a single transaction wherever possible. `stake new` does create + initialize + delegate in one tx. Don't make the user run three commands when one will do.
+### Model user intent, not on-chain mechanics
+Commands map to what the user wants to do, not the underlying Solana instructions. The user wants to "stake" — they don't care that it's create + initialize + delegate. They want to "withdraw" — they don't care about deactivate vs split vs withdraw depending on state. Hide the protocol complexity behind a single verb. Batch multiple on-chain steps into one transaction wherever possible. But do mention the process in help text to avoid too much "magic" — e.g. `sol stake new <amount>` description says "Creates a stake account, funds it and delegates in a single tx".
 
 ### Signpost next actions
 After output, tell the user what they can do next. `stake list` reminds about claimable MEV. `wallet list` hints at `wallet balance` for full details. Don't leave the user wondering "now what?".
