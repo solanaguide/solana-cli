@@ -1,20 +1,37 @@
 # Lending Commands Reference
 
-Lending and borrowing on Kamino Finance.
+Multi-protocol lending and borrowing across Kamino, MarginFi, Drift,
+Jupiter Lend, and Loopscale. The CLI aggregates rates from all
+protocols and auto-selects the best one, or you can target a specific
+protocol with `--protocol`.
+
+## Supported Protocols
+
+| Protocol | Deposit | Withdraw | Borrow | Repay | Notes |
+|----------|---------|----------|--------|-------|-------|
+| Kamino | Yes | Yes | Yes | Yes | SDK-based, health factor monitoring |
+| MarginFi | Yes | Yes | Yes | Yes | SDK-based, multiple accounts per wallet |
+| Drift | Yes | Yes | No | No | SDK-based, spot market deposits |
+| Jupiter Lend | Yes | Yes | No | No | REST API, deposit/withdraw only |
+| Loopscale | Yes | Yes | Yes | Yes | REST API, order-book lending, fixed-term borrows |
 
 ## Check Rates
 
 ```bash
-sol lend rates <token>
+sol lend rates [tokens...]
+sol lend rates --protocol <name>
 ```
 
-Shows current deposit APY and borrow APY for a token on Kamino.
+Shows deposit and borrow APY across all protocols (or a specific
+one). The best deposit rate per token is marked with `*`.
 
 ### Examples
 
 ```bash
-sol lend rates usdc
-sol lend rates sol
+sol lend rates usdc                    # USDC rates across all protocols
+sol lend rates sol usdc                # SOL and USDC rates
+sol lend rates --protocol kamino       # Only Kamino rates
+sol lend rates usdc --protocol loopscale --json
 ```
 
 ### JSON Output
@@ -23,12 +40,20 @@ sol lend rates sol
 {
   "ok": true,
   "data": {
-    "token": "USDC",
-    "deposit_apy": "8.5%",
-    "borrow_apy": "12.3%",
-    "total_deposits": 150000000,
-    "total_borrows": 95000000,
-    "utilization": "63.3%"
+    "tokens": ["USDC"],
+    "protocol": "all",
+    "rates": [
+      {
+        "protocol": "kamino",
+        "token": "USDC",
+        "depositApy": 0.045,
+        "borrowApy": 0.082,
+        "totalDeposited": 150000000,
+        "utilizationPct": 63.3
+      }
+    ],
+    "bestDepositProtocol": { "USDC": "loopscale" },
+    "bestBorrowProtocol": { "USDC": "kamino" }
   },
   "meta": { "elapsed_ms": 800 }
 }
@@ -40,13 +65,14 @@ sol lend rates sol
 sol lend deposit <amount> <token>
 ```
 
-Deposits tokens into a Kamino vault to earn yield.
+Deposits tokens to earn yield. Without `--protocol`, auto-picks the
+protocol with the best deposit rate for that token.
 
 ### Examples
 
 ```bash
-sol lend deposit 100 usdc
-sol lend deposit 5 sol
+sol lend deposit 100 usdc                     # best rate wins
+sol lend deposit 5 sol --protocol marginfi    # target MarginFi
 sol lend deposit 100 usdc --wallet trading
 ```
 
@@ -55,6 +81,7 @@ sol lend deposit 100 usdc --wallet trading
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--wallet <name>` | default | Wallet to deposit from |
+| `--protocol <name>` | auto | Protocol to use (kamino, marginfi, drift, jup-lend, loopscale) |
 
 ## Withdraw
 
@@ -62,14 +89,16 @@ sol lend deposit 100 usdc --wallet trading
 sol lend withdraw <amount|max> <token>
 ```
 
-Withdraws tokens from Kamino.
+Withdraws tokens from a lending position. Without `--protocol`,
+auto-detects which protocol holds the deposit. If deposits exist
+on multiple protocols, you must specify one.
 
 ### Examples
 
 ```bash
-sol lend withdraw 50 usdc                 # partial withdrawal
-sol lend withdraw max sol                 # withdraw everything
-sol lend withdraw max usdc --wallet defi
+sol lend withdraw 50 usdc                     # partial withdrawal
+sol lend withdraw max sol                     # withdraw everything
+sol lend withdraw max usdc --protocol kamino
 ```
 
 Use `max` to withdraw the entire deposited amount.
@@ -79,6 +108,7 @@ Use `max` to withdraw the entire deposited amount.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--wallet <name>` | default | Wallet that owns the deposit |
+| `--protocol <name>` | auto | Protocol to withdraw from |
 
 ## Borrow
 
@@ -86,17 +116,15 @@ Use `max` to withdraw the entire deposited amount.
 sol lend borrow <amount> <token> --collateral <token>
 ```
 
-Borrows tokens against deposited collateral.
+Borrows tokens against collateral. Supported on Kamino, MarginFi,
+and Loopscale. Without `--protocol`, defaults to Kamino.
 
 ### Examples
 
 ```bash
 sol lend borrow 500 usdc --collateral sol
-sol lend borrow 1 sol --collateral usdc
+sol lend borrow 0.1 usdc --collateral sol --protocol loopscale
 ```
-
-You must have sufficient collateral deposited first. The CLI will
-warn if the resulting health factor would be dangerously low.
 
 ### Flags
 
@@ -104,6 +132,15 @@ warn if the resulting health factor would be dangerously low.
 |------|-------------|
 | `--collateral <token>` | Required. Token to use as collateral |
 | `--wallet <name>` | Wallet that owns the collateral |
+| `--protocol <name>` | Protocol to borrow from (default: kamino) |
+
+### Protocol differences
+
+- **Kamino / MarginFi**: Pool-based variable rates. Health factor
+  monitored in real time.
+- **Loopscale**: Order-book with fixed-rate, fixed-term loans
+  (1-day default, auto-refinances). Rate shown at borrow time
+  reflects the actual rate locked in.
 
 ## Repay
 
@@ -111,13 +148,15 @@ warn if the resulting health factor would be dangerously low.
 sol lend repay <amount|max> <token>
 ```
 
-Repays borrowed tokens.
+Repays borrowed tokens. Without `--protocol`, auto-detects which
+protocol holds the loan.
 
 ### Examples
 
 ```bash
-sol lend repay 250 usdc                   # partial repay
-sol lend repay max usdc                   # repay full outstanding debt
+sol lend repay 250 usdc                       # partial repay
+sol lend repay max usdc                       # repay full debt
+sol lend repay max usdc --protocol loopscale
 ```
 
 Use `max` to repay the entire borrowed amount.
@@ -126,11 +165,12 @@ Use `max` to repay the entire borrowed amount.
 
 ```bash
 sol lend positions
+sol lend positions --protocol <name>
 sol lend positions --wallet trading
 ```
 
-Lists all deposits and borrows — token, amount, APY, USD value,
-and health factor.
+Lists all deposits and borrows across all protocols — token, amount,
+APY, USD value, and health factor (where available).
 
 The CLI warns when health factor drops below 1.1.
 
@@ -140,26 +180,28 @@ The CLI warns when health factor drops below 1.1.
 {
   "ok": true,
   "data": {
-    "deposits": [
+    "wallet": "main",
+    "protocol": "all",
+    "positions": [
       {
+        "protocol": "kamino",
         "token": "USDC",
+        "type": "deposit",
         "amount": 100,
-        "value_usd": 100,
-        "apy": "8.5%"
-      }
-    ],
-    "borrows": [
+        "valueUsd": 100,
+        "apy": 0.045
+      },
       {
+        "protocol": "loopscale",
         "token": "USDC",
+        "type": "borrow",
         "amount": 50,
-        "value_usd": 50,
-        "apy": "12.3%"
+        "valueUsd": 50,
+        "apy": 0.06
       }
-    ],
-    "health_factor": 2.1,
-    "net_value_usd": 50
+    ]
   },
-  "meta": { "elapsed_ms": 1000 }
+  "meta": { "elapsed_ms": 1200 }
 }
 ```
 
@@ -172,3 +214,7 @@ by liquidation thresholds). Below 1.0 means liquidation risk.
 - **1.1 – 2.0**: Monitor closely
 - **< 1.1**: CLI warns — consider repaying or adding collateral
 - **< 1.0**: Liquidation possible
+
+Note: Loopscale uses fixed-term LTV at origination rather than a
+real-time health factor, so health factor is not shown for Loopscale
+positions.

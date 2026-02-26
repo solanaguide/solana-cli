@@ -17,7 +17,7 @@ sol token swap 50 usdc bonk
 # Stake idle SOL
 sol stake new 10
 
-# Deposit USDC to earn yield on Kamino
+# Deposit USDC to earn yield (auto-picks best rate across protocols)
 sol lend deposit 100 usdc
 
 # See everything you hold
@@ -150,14 +150,16 @@ sol stake withdraw 7gK...abc                  # Smart withdraw (handles deactiva
 
 Creates a stake account, funds it, and delegates — all in a single transaction. The CLI handles the multi-step Solana staking process so you don't have to.
 
-### lend — Lending and borrowing on Kamino Finance
+### lend — Multi-protocol lending and borrowing
+
+Aggregates rates across Kamino, MarginFi, Drift, Jupiter Lend, and Loopscale. Auto-picks the best rate, or use `--protocol` to target a specific one.
 
 ```bash
-sol lend rates sol                            # Deposit/borrow APY for SOL
-sol lend rates usdc                           # USDC rates
+sol lend rates usdc                           # Compare rates across all protocols
+sol lend rates sol --protocol kamino          # Rates for a specific protocol
 
-sol lend deposit 100 usdc                     # Deposit USDC to earn yield
-sol lend deposit 5 sol                        # Deposit SOL as collateral
+sol lend deposit 100 usdc                     # Auto-picks best deposit rate
+sol lend deposit 5 sol --protocol marginfi    # Deposit into a specific protocol
 sol lend withdraw 50 usdc                     # Partial withdrawal
 sol lend withdraw max sol                     # Withdraw entire deposit
 
@@ -165,10 +167,10 @@ sol lend borrow 500 usdc --collateral sol     # Borrow against collateral
 sol lend repay 250 usdc                       # Partial repay
 sol lend repay max usdc                       # Repay full outstanding debt
 
-sol lend positions                            # All deposits, borrows, health factor
+sol lend positions                            # All deposits and borrows across protocols
 ```
 
-Positions include real-time APY, USD values, and health factor monitoring. The CLI warns when health factor drops below 1.1.
+Positions include real-time APY, USD values, and health factor monitoring. The CLI warns when health factor drops below 1.1. Without `--protocol`, deposits auto-select the highest-yielding protocol, and withdrawals/repays auto-detect which protocol holds the position.
 
 ### portfolio — Unified view across all positions
 
@@ -286,7 +288,7 @@ The transaction log is the source of truth for cost basis and P&L — every swap
 - **CLI framework**: commander.js
 - **Solana SDK**: `@solana/kit` v2
 - **Swaps**: Jupiter REST API (no SDK, no API key)
-- **Lending**: Kamino Finance via `@kamino-finance/klend-sdk`
+- **Lending**: Kamino (`@kamino-finance/klend-sdk`), MarginFi (`@mrgnlabs/marginfi-client-v2`), Drift (`@drift-labs/sdk`), Jupiter Lend (REST), Loopscale (REST)
 - **Prices**: Jupiter Price API with CoinGecko fallback
 - **Database**: SQLite via `better-sqlite3` (WAL mode)
 - **Config**: TOML via `smol-toml`

@@ -179,14 +179,16 @@ withdrawals, and force unstake.
 
 ## Earn Yield by Lending
 
-Deposit tokens into Kamino Finance to earn interest, or borrow
-against your deposits.
+Compare rates and lend across five protocols — Kamino, MarginFi,
+Drift, Jupiter Lend, and Loopscale. The CLI auto-picks the best
+rate, or you can target a specific protocol with `--protocol`.
 
 ```bash
-sol lend rates usdc                     # current APY
-sol lend deposit 100 usdc               # start earning
+sol lend rates usdc                     # compare APY across all protocols
+sol lend deposit 100 usdc               # auto-picks best deposit rate
+sol lend deposit 5 sol --protocol kamino
 sol lend borrow 500 usdc --collateral sol
-sol lend positions                      # everything you've got open
+sol lend positions                      # everything across all protocols
 ```
 
 See references/lending-commands.md for full details.
