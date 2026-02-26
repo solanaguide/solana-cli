@@ -289,6 +289,16 @@ Read-only commands (`token browse/price/info/list`, `wallet list/balance`, `stak
 
 Permissions cannot be changed via `sol config set` — they must be edited in `config.toml` directly.
 
+## Security Model
+
+Private keys are stored as files in `~/.sol/wallets/`. The CLI reads them at transaction-signing time — they are never exposed as environment variables or printed to stdout. An LLM agent using this tool cannot read the raw key material without explicitly opening those files, which requires user approval in standard permission modes.
+
+Permissions (above) limit what operations the CLI can perform, and the user is prompted to confirm each CLI invocation. Together these provide two layers of control: the agent must both have the permission enabled *and* get approval for each action.
+
+**What this does not protect against:** These controls operate at the CLI and agent-permission level. They do not prevent other software on the same machine from reading the key files. Any tool, MCP server, plugin, or script running under the same OS user account can read `~/.sol/wallets/` directly. If you grant an agent access to additional tools — especially ones that can read arbitrary files or execute shell commands — those tools can extract your private keys regardless of Sol CLI permissions.
+
+Keep wallet balances appropriate to the risk: use dedicated wallets with limited funds for agent-driven workflows, and do not store large holdings in key files accessible to automated tooling.
+
 ## Troubleshooting
 
 See references/troubleshooting.md for common issues (RPC rate limits,
