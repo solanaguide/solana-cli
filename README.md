@@ -186,7 +186,28 @@ sol portfolio pnl                             # P&L since first snapshot
 sol portfolio pnl --since 5                   # P&L since snapshot #5
 ```
 
-The portfolio aggregates tokens, staked SOL, and Kamino lending positions across all wallets. Snapshots enable tracking changes over time — useful for agents that need to measure the impact of their actions.
+The portfolio aggregates tokens, staked SOL, lending positions, open orders, and prediction market positions across all wallets. Snapshots enable tracking changes over time — useful for agents that need to measure the impact of their actions.
+
+### predict — Prediction markets via Jupiter
+
+```bash
+sol predict list                             # Browse all events by volume
+sol predict list crypto                      # Filter by category
+sol predict list sports --filter trending    # Trending sports events
+sol predict search "solana"                  # Search by keyword
+
+sol predict event POLY-89525                 # Event detail with all markets
+sol predict market POLY-701571               # Market prices + orderbook
+
+sol predict buy 5 yes POLY-701571            # Buy YES contracts with $5 USDC
+sol predict buy 10 no POLY-559652 --max-price 0.40  # Buy NO with price limit
+sol predict positions                        # All open positions with P&L
+sol predict sell <positionPubkey>             # Sell/close a position
+sol predict claim <positionPubkey>           # Claim winnings on resolved market
+sol predict history                          # Transaction history
+```
+
+Markets are sourced from Polymarket and Kalshi via Jupiter's prediction market API. Categories include crypto, sports, politics, culture, economics, tech, finance, and more. Positions appear in `sol portfolio` with unrealized P&L, and claimable winnings are highlighted.
 
 ### config — Persistent settings
 
@@ -288,6 +309,12 @@ src/
 - All transactions are logged to SQLite for audit
 - Swap commands show quote details before executing
 
+An LLM agent using this tool cannot read the raw key material without explicitly opening the wallet files, which requires user approval in standard permission modes. Combined with permissions (below), this provides two layers of control: the agent must both have the permission enabled *and* get approval for each action.
+
+**What this does not protect against:** These controls operate at the CLI and agent-permission level. They do not prevent other software on the same machine from reading the key files. Any tool, MCP server, plugin, or script running under the same OS user account can read `~/.sol/wallets/` directly. If you grant an agent access to additional tools — especially ones that can read arbitrary files or execute shell commands — those tools can extract your private keys regardless of Sol CLI permissions.
+
+Keep wallet balances appropriate to the risk: use dedicated wallets with limited funds for agent-driven workflows, and do not store large holdings in key files accessible to automated tooling.
+
 ## Permissions
 
 Restrict which operations are available — useful for giving agents limited access (e.g. monitor-only, swap-but-no-transfer). Disabled commands are not registered at all, so they won't appear in `--help`.
@@ -306,6 +333,7 @@ canBurn = false
 canCreateWallet = false
 canRemoveWallet = false
 canExportWallet = false
+canPredict = false
 ```
 
 | Permission | Gated subcommands |
@@ -316,6 +344,7 @@ canExportWallet = false
 | `canWithdrawStake` | `stake withdraw`, `stake claim-mev` |
 | `canLend` | `lend deposit`, `lend borrow` |
 | `canWithdrawLend` | `lend withdraw`, `lend repay` |
+| `canPredict` | `predict buy`, `predict sell`, `predict claim` |
 | `canBurn` | `token burn`, `token close --burn` (runtime) |
 | `canCreateWallet` | `wallet create`, `wallet import` |
 | `canRemoveWallet` | `wallet remove` |

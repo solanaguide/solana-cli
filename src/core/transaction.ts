@@ -116,6 +116,28 @@ export interface SendResult {
   explorerUrl: string;
 }
 
+/**
+ * Inject TransactionSigner references into instruction accounts that match known signers.
+ * v1→v2 instruction conversions only produce role bits (2=READONLY_SIGNER, 3=WRITABLE_SIGNER)
+ * without actual signer objects. signTransactionMessageWithSigners requires IAccountSignerMeta
+ * entries to find signers, so we inject them here.
+ */
+function injectSigners(
+  instructions: IInstruction[],
+  signers: TransactionSigner[],
+): IInstruction[] {
+  const signerMap = new Map(signers.map(s => [s.address, s]));
+  return instructions.map(ix => ({
+    ...ix,
+    accounts: (ix.accounts ?? []).map((acc: any) => {
+      if ((acc.role === 2 || acc.role === 3) && signerMap.has(acc.address) && !acc.signer) {
+        return { ...acc, signer: signerMap.get(acc.address)! };
+      }
+      return acc;
+    }),
+  }));
+}
+
 export async function buildAndSendTransaction(
   instructions: IInstruction[],
   payer: TransactionSigner,
@@ -147,7 +169,7 @@ export async function buildAndSendTransaction(
         createTransactionMessage({ version: 0 }),
         m => setTransactionMessageFeePayer(payer.address, m),
         m => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, m),
-        m => appendTransactionMessageInstructions([...instructions, createNoopInstruction()], m),
+        m => appendTransactionMessageInstructions(injectSigners([...instructions, createNoopInstruction()], [payer]), m),
       );
 
       const signedTx = await signTransactionMessageWithSigners(message);

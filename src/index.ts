@@ -9,6 +9,7 @@ import { registerLendCommand } from './commands/lend.js';
 import { registerPortfolioCommand } from './commands/portfolio.js';
 import { registerTxCommand } from './commands/tx.js';
 import { registerNetworkCommand } from './commands/network.js';
+import { registerPredictCommand } from './commands/predict.js';
 import { closeDb } from './db/database.js';
 
 const program = new Command();
@@ -36,6 +37,7 @@ registerLendCommand(program);
 registerPortfolioCommand(program);
 registerTxCommand(program);
 registerNetworkCommand(program);
+registerPredictCommand(program);
 
 // Custom help: show subcommands grouped under each parent
 program.configureHelp({

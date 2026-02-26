@@ -2,10 +2,11 @@
 name: solana-payments-wallets-trading
 description: >-
   Pay people in SOL or USDC, buy and sell tokens, check prices, manage Solana
-  wallets, stake SOL, earn yield through lending, and track portfolio
-  performance — all from the command line. No API keys, no private key env
-  vars. Use when the user wants to send crypto, trade, check balances, earn
-  yield, or see how their holdings are doing.
+  wallets, stake SOL, earn yield through lending, trade prediction markets,
+  and track portfolio performance — all from the command line. No API keys,
+  no private key env vars. Use when the user wants to send crypto, trade,
+  check balances, earn yield, bet on predictions, or see how their holdings
+  are doing.
 license: MIT
 metadata:
   author: solanaguide
@@ -189,6 +190,28 @@ sol lend positions                      # everything you've got open
 ```
 
 See references/lending-commands.md for full details.
+
+## Trade Prediction Markets
+
+Browse and trade prediction markets from Polymarket and Kalshi via
+Jupiter. Categories include crypto, sports, politics, culture, and more.
+
+```bash
+sol predict list crypto                     # browse crypto events
+sol predict search "solana"                 # search by keyword
+sol predict event POLY-89525                # event detail with markets
+sol predict market POLY-701571              # prices + orderbook
+
+sol predict buy 5 yes POLY-701571           # buy YES contracts
+sol predict positions                       # open positions with P&L
+sol predict sell <positionPubkey>            # close a position
+sol predict claim <positionPubkey>           # claim resolved winnings
+sol predict history                         # transaction history
+```
+
+Positions appear in `sol portfolio` with unrealized P&L.
+
+See references/prediction-commands.md for the full reference.
 
 ## Track How Your Portfolio Is Doing
 

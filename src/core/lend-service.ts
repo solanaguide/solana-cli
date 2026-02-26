@@ -1,495 +1,248 @@
-import { address, type IInstruction } from '@solana/kit';
-import {
-  KaminoMarket,
-  KaminoAction,
-  VanillaObligation,
-  U64_MAX,
-  type KaminoReserve,
-  type KaminoObligation,
-} from '@kamino-finance/klend-sdk';
-import {
-  KLEND_PROGRAM_ID,
-  KAMINO_MAIN_MARKET,
-  RECENT_SLOT_DURATION_MS,
-  getKaminoRpc,
-  kAddress,
-  kSigner,
-  toV2Instructions,
-  getCurrentSlot,
-} from './kamino-compat.js';
-import { loadSigner } from './wallet-manager.js';
-import { resolveToken, type TokenMetadata } from './token-registry.js';
-import { getPrices } from './price-service.js';
-import { buildAndSendTransaction } from './transaction.js';
 import { verbose } from '../output/formatter.js';
-import { uiToTokenAmount, SOL_MINT } from '../utils/solana.js';
-import { getTokenBalances } from './token-service.js';
+import { getConfigValue } from './config-manager.js';
+import { loadSigner } from './wallet-manager.js';
+import type {
+  LendProvider,
+  LendWriteResult,
+  LendingRate,
+  LendingPosition,
+  ProtocolName,
+} from './lend/lend-provider.js';
+import { PROTOCOL_NAMES } from './lend/lend-provider.js';
+import { KaminoProvider } from './lend/kamino-provider.js';
+import { MarginfiProvider } from './lend/marginfi-provider.js';
+import { DriftProvider } from './lend/drift-provider.js';
+import { JupiterLendProvider } from './lend/jupiter-lend-provider.js';
+import { LoopscaleProvider } from './lend/loopscale-provider.js';
 
-// ── Types ─────────────────────────────────────────────────
+// Re-export types so existing imports keep working
+export type { LendingRate, LendingPosition, LendWriteResult } from './lend/lend-provider.js';
 
-export interface LendingRate {
-  protocol: string;
-  token: string;
-  mint: string;
-  depositApy: number;
-  borrowApy: number;
-  totalDeposited: number;
-  totalBorrowed: number;
-  utilizationPct: number;
+// ── Provider registry ────────────────────────────────────
+
+const providers: LendProvider[] = [
+  new KaminoProvider(),
+  new MarginfiProvider(),
+  new DriftProvider(),
+  new JupiterLendProvider(),
+  new LoopscaleProvider(),
+];
+
+function getProvider(name: string): LendProvider {
+  const p = providers.find(p => p.name === name);
+  if (!p) throw new Error(`Unknown protocol: ${name}. Available: ${providers.map(p => p.name).join(', ')}`);
+  return p;
 }
 
-export interface LendingPosition {
-  protocol: string;
-  token: string;
-  mint: string;
-  type: 'deposit' | 'borrow';
-  amount: number;
-  valueUsd: number;
-  apy: number;
-  healthFactor?: number;
-}
-
-// ── Market caching ────────────────────────────────────────
-
-let cachedMarket: KaminoMarket | null = null;
-let marketLoadedAt = 0;
-const MARKET_TTL_MS = 60_000;
-
-async function loadMarket(): Promise<KaminoMarket> {
-  const now = Date.now();
-  if (cachedMarket && (now - marketLoadedAt) < MARKET_TTL_MS) {
-    return cachedMarket;
+function resolveProtocol(protocol?: string): string | undefined {
+  if (!protocol) {
+    const defaultProto = getConfigValue('lend.defaultProtocol') as string | undefined;
+    return defaultProto || undefined;
   }
-
-  verbose('Loading Kamino lending market...');
-  const market = await KaminoMarket.load(
-    getKaminoRpc(),
-    kAddress(KAMINO_MAIN_MARKET),
-    RECENT_SLOT_DURATION_MS,
-    kAddress(KLEND_PROGRAM_ID),
-    true, // load reserves
-  );
-  if (!market) throw new Error('Failed to load Kamino lending market');
-
-  cachedMarket = market;
-  marketLoadedAt = now;
-  return market;
+  const normalized = protocol.toLowerCase();
+  if (!PROTOCOL_NAMES.includes(normalized as ProtocolName)) {
+    throw new Error(`Unknown protocol: ${protocol}. Available: ${PROTOCOL_NAMES.join(', ')}`);
+  }
+  return normalized;
 }
 
-function invalidateMarketCache(): void {
-  cachedMarket = null;
-  marketLoadedAt = 0;
+// ── Read operations (all protocols, Promise.allSettled) ───
+
+export interface RatesResult {
+  rates: LendingRate[];
+  warnings: string[];
+  bestDepositProtocol: Record<string, string>;
+  bestBorrowProtocol: Record<string, string>;
 }
 
-// ── Helpers ───────────────────────────────────────────────
+export async function getRates(tokens?: string[], protocol?: string): Promise<RatesResult> {
+  const proto = resolveProtocol(protocol);
 
-async function resolveTokenStrict(symbolOrMint: string): Promise<TokenMetadata> {
-  const meta = await resolveToken(symbolOrMint);
-  if (!meta) throw new Error(`Unknown token: ${symbolOrMint}`);
-  return meta;
-}
+  const targets = proto ? [getProvider(proto)] : providers;
+  const results = await Promise.allSettled(targets.map(p => p.getRates(tokens)));
 
-function obligationHealthFactor(obligation: KaminoObligation): number | undefined {
-  const stats = obligation.refreshedStats;
-  const borrowValue = stats.userTotalBorrowBorrowFactorAdjusted.toNumber();
-  const liquidationLimit = stats.borrowLiquidationLimit.toNumber();
-  if (borrowValue <= 0) return undefined;
-  return liquidationLimit / borrowValue;
-}
+  const rates: LendingRate[] = [];
+  const warnings: string[] = [];
 
-async function getWalletBalance(walletAddress: string, mint: string): Promise<number> {
-  const balances = await getTokenBalances(walletAddress);
-  const token = balances.find(b => b.mint === mint);
-  return token?.uiBalance ?? 0;
-}
-
-async function getUserObligation(market: KaminoMarket, walletAddress: string): Promise<KaminoObligation | null> {
-  return market.getObligationByWallet(
-    kAddress(walletAddress),
-    new VanillaObligation(kAddress(KLEND_PROGRAM_ID)),
-  );
-}
-
-// ── Read operations ───────────────────────────────────────
-
-export async function getRates(tokens?: string[]): Promise<LendingRate[]> {
-  const market = await loadMarket();
-  const slot = await getCurrentSlot();
-
-  let reserves: KaminoReserve[];
-
-  if (tokens && tokens.length > 0) {
-    verbose(`Fetching Kamino lending rates for ${tokens.join(', ')}`);
-    reserves = [];
-    for (const token of tokens) {
-      const meta = await resolveTokenStrict(token);
-      const reserve = market.getReserveByMint(kAddress(meta.mint)) as KaminoReserve | undefined;
-      if (reserve) reserves.push(reserve);
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    if (r.status === 'fulfilled') {
+      rates.push(...r.value);
+    } else {
+      const name = targets[i].name;
+      verbose(`${name} rates failed: ${r.reason}`);
+      warnings.push(`${name}: ${r.reason?.message || r.reason}`);
     }
-  } else {
-    verbose('Fetching all Kamino lending rates');
-    reserves = market.getReserves();
   }
 
-  return reserves.map(reserve => {
-    const mintFactor = Math.pow(10, reserve.getMintDecimals());
-    return {
-      protocol: 'kamino',
-      token: reserve.getTokenSymbol(),
-      mint: String(reserve.getLiquidityMint()),
-      depositApy: reserve.totalSupplyAPY(slot),
-      borrowApy: reserve.totalBorrowAPY(slot),
-      totalDeposited: reserve.getTotalSupply().toNumber() / mintFactor,
-      totalBorrowed: reserve.getBorrowedAmount().toNumber() / mintFactor,
-      utilizationPct: reserve.calculateUtilizationRatio() * 100,
-    };
-  });
+  // Compute best protocol per token
+  const bestDepositProtocol: Record<string, string> = {};
+  const bestBorrowProtocol: Record<string, string> = {};
+
+  const byToken = new Map<string, LendingRate[]>();
+  for (const r of rates) {
+    const arr = byToken.get(r.token) ?? [];
+    arr.push(r);
+    byToken.set(r.token, arr);
+  }
+
+  for (const [token, tokenRates] of byToken) {
+    const bestDeposit = tokenRates.reduce((best, r) => r.depositApy > best.depositApy ? r : best);
+    bestDepositProtocol[token] = bestDeposit.protocol;
+
+    const borrowRates = tokenRates.filter(r => r.borrowApy > 0);
+    if (borrowRates.length > 0) {
+      const bestBorrow = borrowRates.reduce((best, r) => r.borrowApy < best.borrowApy ? r : best);
+      bestBorrowProtocol[token] = bestBorrow.protocol;
+    }
+  }
+
+  return { rates, warnings, bestDepositProtocol, bestBorrowProtocol };
 }
 
-export async function getPositions(walletAddress: string): Promise<LendingPosition[]> {
-  verbose(`Fetching Kamino lending positions for ${walletAddress}`);
+export async function getPositions(walletAddress: string, protocol?: string): Promise<LendingPosition[]> {
+  const proto = resolveProtocol(protocol);
 
-  const market = await loadMarket();
-  const obligations: KaminoObligation[] = await market.getAllUserObligations(kAddress(walletAddress));
-  if (obligations.length === 0) return [];
+  const targets = proto ? [getProvider(proto)] : providers;
+  const results = await Promise.allSettled(targets.map(p => p.getPositions(walletAddress)));
 
-  const slot = await getCurrentSlot();
   const positions: LendingPosition[] = [];
 
-  for (const obligation of obligations) {
-    const healthFactor = obligationHealthFactor(obligation);
-
-    // Deposits
-    for (const [reserveAddr, deposit] of obligation.deposits) {
-      const reserve = market.getReserveByAddress(reserveAddr) as KaminoReserve | undefined;
-      if (!reserve) continue;
-
-      const mintFactor = Math.pow(10, reserve.getMintDecimals());
-      const amount = deposit.amount.toNumber() / mintFactor;
-      if (amount <= 0) continue;
-
-      positions.push({
-        protocol: 'kamino',
-        token: reserve.getTokenSymbol(),
-        mint: String(reserve.getLiquidityMint()),
-        type: 'deposit',
-        amount,
-        valueUsd: deposit.marketValueRefreshed.toNumber(),
-        apy: reserve.totalSupplyAPY(slot),
-      });
-    }
-
-    // Borrows
-    for (const [reserveAddr, borrow] of obligation.borrows) {
-      const reserve = market.getReserveByAddress(reserveAddr) as KaminoReserve | undefined;
-      if (!reserve) continue;
-
-      const mintFactor = Math.pow(10, reserve.getMintDecimals());
-      const amount = borrow.amount.toNumber() / mintFactor;
-      if (amount <= 0) continue;
-
-      positions.push({
-        protocol: 'kamino',
-        token: reserve.getTokenSymbol(),
-        mint: String(reserve.getLiquidityMint()),
-        type: 'borrow',
-        amount,
-        valueUsd: borrow.marketValueRefreshed.toNumber(),
-        apy: reserve.totalBorrowAPY(slot),
-        healthFactor,
-      });
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    if (r.status === 'fulfilled') {
+      positions.push(...r.value);
+    } else {
+      verbose(`${targets[i].name} positions failed: ${r.reason}`);
     }
   }
 
   return positions;
 }
 
-// ── Write operations ──────────────────────────────────────
+// ── Write operations (single protocol, fail fast) ────────
 
 export async function deposit(
   walletName: string,
   token: string,
   amount: number,
-): Promise<{ signature: string; protocol: string; explorerUrl: string }> {
-  const meta = await resolveTokenStrict(token);
-  const signer = await loadSigner(walletName);
-  const market = await loadMarket();
+  protocol?: string,
+): Promise<LendWriteResult> {
+  const proto = resolveProtocol(protocol);
 
-  const reserve = market.getReserveByMint(kAddress(meta.mint));
-  if (!reserve) throw new Error(`No Kamino reserve for ${meta.symbol}`);
+  if (proto) {
+    return getProvider(proto).deposit(walletName, token, amount);
+  }
 
-  const rawAmount = uiToTokenAmount(amount, meta.decimals).toString();
+  // Auto-select: pick protocol with best deposit rate for this token
+  const { rates, bestDepositProtocol } = await getRates([token]);
+  const bestProto = bestDepositProtocol[token.toUpperCase()] ?? bestDepositProtocol[token];
 
-  const action = await KaminoAction.buildDepositTxns(
-    market,
-    rawAmount,
-    kAddress(meta.mint),
-    kSigner(signer),
-    new VanillaObligation(kAddress(KLEND_PROGRAM_ID)),
-    true,       // useV2Ixs
-    undefined,  // scopeRefreshConfig
-    300_000,    // extraComputeBudget
-    true,       // includeAtaIxs
-  );
+  if (!bestProto && rates.length === 0) {
+    throw new Error(`No lending protocol has a reserve for ${token}`);
+  }
 
-  const instructions = toV2Instructions(KaminoAction.actionToIxs(action));
-
-  const prices = await getPrices([meta.mint]);
-  const price = prices.get(meta.mint)?.priceUsd;
-
-  const result = await buildAndSendTransaction(instructions, signer, {
-    txType: 'lend-deposit',
-    walletName,
-    fromMint: meta.mint,
-    fromAmount: rawAmount,
-    fromPriceUsd: price,
-  });
-
-  invalidateMarketCache();
-
-  return {
-    signature: result.signature,
-    protocol: 'kamino',
-    explorerUrl: result.explorerUrl,
-  };
+  const target = bestProto ? getProvider(bestProto) : providers[0];
+  verbose(`Auto-selected ${target.name} (best deposit rate for ${token})`);
+  return target.deposit(walletName, token, amount);
 }
 
 export async function withdraw(
   walletName: string,
   token: string,
-  amount: number, // Infinity = withdraw all
-): Promise<{ signature: string; explorerUrl: string }> {
-  const meta = await resolveTokenStrict(token);
-  const signer = await loadSigner(walletName);
-  const market = await loadMarket();
+  amount: number,
+  protocol?: string,
+): Promise<LendWriteResult> {
+  const proto = resolveProtocol(protocol);
 
-  const reserve = market.getReserveByMint(kAddress(meta.mint));
-  if (!reserve) throw new Error(`No Kamino reserve for ${meta.symbol}`);
-
-  // Detect "withdraw all": use U64_MAX so the on-chain program withdraws exact deposit
-  let rawAmount: string;
-  if (!isFinite(amount)) {
-    rawAmount = U64_MAX;
-    verbose('Using U64_MAX for full withdrawal');
-  } else {
-    // Check if amount covers full deposit — if so, use U64_MAX for clean withdrawal
-    const obligation = await getUserObligation(market, signer.address);
-    if (obligation) {
-      const depositPos = obligation.getDepositByMint(kAddress(meta.mint));
-      if (depositPos) {
-        const depositUi = depositPos.amount.toNumber() / Math.pow(10, meta.decimals);
-        if (amount >= depositUi) {
-          rawAmount = U64_MAX;
-          verbose(`Withdraw amount ${amount} >= deposit ${depositUi.toFixed(meta.decimals)}, using U64_MAX for clean full withdrawal`);
-        } else {
-          rawAmount = uiToTokenAmount(amount, meta.decimals).toString();
-        }
-      } else {
-        rawAmount = uiToTokenAmount(amount, meta.decimals).toString();
-      }
-    } else {
-      rawAmount = uiToTokenAmount(amount, meta.decimals).toString();
-    }
+  if (proto) {
+    return getProvider(proto).withdraw(walletName, token, amount);
   }
 
-  const action = await KaminoAction.buildWithdrawTxns(
-    market,
-    rawAmount,
-    kAddress(meta.mint),
-    kSigner(signer),
-    new VanillaObligation(kAddress(KLEND_PROGRAM_ID)),
-    true,
-    undefined,
-    300_000,
-    true,
+  // Auto-select: find which protocol(s) the user has a deposit in for this token
+  const signer = await loadSigner(walletName);
+  const allPositions = await getPositions(signer.address);
+  const tokenUpper = token.toUpperCase();
+  const deposits = allPositions.filter(p =>
+    p.type === 'deposit' && p.token.toUpperCase() === tokenUpper
   );
 
-  const instructions = toV2Instructions(KaminoAction.actionToIxs(action));
+  if (deposits.length === 0) {
+    throw new Error(`No ${token} deposit found. Check with: sol lend positions`);
+  }
+  if (deposits.length === 1) {
+    return getProvider(deposits[0].protocol).withdraw(walletName, token, amount);
+  }
 
-  const prices = await getPrices([meta.mint]);
-  const price = prices.get(meta.mint)?.priceUsd;
+  // Ambiguous — multiple protocols have deposits
+  const protos = [...new Set(deposits.map(d => d.protocol))];
+  if (protos.length === 1) {
+    return getProvider(protos[0]).withdraw(walletName, token, amount);
+  }
 
-  const result = await buildAndSendTransaction(instructions, signer, {
-    txType: 'lend-withdraw',
-    walletName,
-    toMint: meta.mint,
-    toAmount: rawAmount,
-    toPriceUsd: price,
-  });
-
-  invalidateMarketCache();
-
-  return {
-    signature: result.signature,
-    explorerUrl: result.explorerUrl,
-  };
+  throw new Error(
+    `${token} deposits found on multiple protocols: ${protos.join(', ')}. ` +
+    `Specify one with --protocol, e.g.: sol lend withdraw ${amount} ${token} --protocol ${protos[0]}`
+  );
 }
 
 export async function borrow(
   walletName: string,
   token: string,
   amount: number,
-  collateralToken: string,
-): Promise<{ signature: string; explorerUrl: string; healthFactor?: number }> {
-  const borrowMeta = await resolveTokenStrict(token);
-  const collateralMeta = await resolveTokenStrict(collateralToken);
-  const signer = await loadSigner(walletName);
-  const market = await loadMarket();
+  collateral: string,
+  protocol?: string,
+): Promise<LendWriteResult> {
+  const proto = resolveProtocol(protocol) ?? 'kamino'; // Default to kamino for borrow
 
-  const borrowReserve = market.getReserveByMint(kAddress(borrowMeta.mint));
-  if (!borrowReserve) throw new Error(`No Kamino reserve for ${borrowMeta.symbol}`);
-
-  const collateralReserve = market.getReserveByMint(kAddress(collateralMeta.mint));
-  if (!collateralReserve) throw new Error(`No Kamino reserve for ${collateralMeta.symbol}`);
-
-  const rawAmount = uiToTokenAmount(amount, borrowMeta.decimals).toString();
-
-  const action = await KaminoAction.buildBorrowTxns(
-    market,
-    rawAmount,
-    kAddress(borrowMeta.mint),
-    kSigner(signer),
-    new VanillaObligation(kAddress(KLEND_PROGRAM_ID)),
-    true,
-    undefined,
-    300_000,
-    true,
-  );
-
-  const instructions = toV2Instructions(KaminoAction.actionToIxs(action));
-
-  const prices = await getPrices([borrowMeta.mint]);
-  const borrowPrice = prices.get(borrowMeta.mint)?.priceUsd;
-
-  const result = await buildAndSendTransaction(instructions, signer, {
-    txType: 'lend-borrow',
-    walletName,
-    toMint: borrowMeta.mint,
-    toAmount: rawAmount,
-    toPriceUsd: borrowPrice,
-  });
-
-  invalidateMarketCache();
-
-  // Fetch updated health factor (best-effort)
-  let healthFactor: number | undefined;
-  try {
-    const updated = await loadMarket();
-    const obligation = await updated.getObligationByWallet(
-      kAddress(signer.address),
-      new VanillaObligation(kAddress(KLEND_PROGRAM_ID)),
+  const provider = getProvider(proto);
+  if (!provider.capabilities.borrow || !provider.borrow) {
+    const available = providers.filter(p => p.capabilities.borrow).map(p => p.name);
+    throw new Error(
+      `${provider.name} does not support borrowing. Available: ${available.join(', ')}`
     );
-    if (obligation) healthFactor = obligationHealthFactor(obligation);
-  } catch { /* non-critical */ }
+  }
 
-  return {
-    signature: result.signature,
-    explorerUrl: result.explorerUrl,
-    healthFactor,
-  };
+  return provider.borrow(walletName, token, amount, collateral);
 }
 
 export async function repay(
   walletName: string,
   token: string,
-  amount: number, // Infinity = repay all
-): Promise<{ signature: string; explorerUrl: string; remainingDebt?: number }> {
-  const meta = await resolveTokenStrict(token);
-  const signer = await loadSigner(walletName);
-  const market = await loadMarket();
+  amount: number,
+  protocol?: string,
+): Promise<LendWriteResult> {
+  const proto = resolveProtocol(protocol);
 
-  const reserve = market.getReserveByMint(kAddress(meta.mint));
-  if (!reserve) throw new Error(`No Kamino reserve for ${meta.symbol}`);
-
-  // Determine repay amount:
-  // - "repay max" (Infinity): full repay using U64_MAX sentinel
-  // - exact amount >= debt: use U64_MAX for clean close (avoids dust)
-  // - exact amount < debt: partial repay (must leave non-dust remainder)
-  //
-  // On-chain constraints:
-  // - U64_MAX tells the program to repay exact debt + interest, but requires
-  //   the wallet to hold enough tokens to cover it
-  // - Partial repay that leaves near-zero debt triggers NetValueRemainingTooSmall
-  const obligation = await getUserObligation(market, signer.address);
-  const borrowPos = obligation?.getBorrowByMint(kAddress(meta.mint));
-  const debtUi = borrowPos
-    ? borrowPos.amount.toNumber() / Math.pow(10, meta.decimals)
-    : 0;
-
-  let rawAmount: string;
-  const wantFullRepay = !isFinite(amount) || (debtUi > 0 && amount >= debtUi);
-
-  if (wantFullRepay && debtUi > 0) {
-    // Check wallet can cover debt + interest margin
-    const walletBalance = await getWalletBalance(signer.address, meta.mint);
-    if (walletBalance >= debtUi * 1.002) {
-      rawAmount = U64_MAX;
-      verbose(`Wallet balance ${walletBalance} covers debt ${debtUi}, using U64_MAX for full repay`);
-    } else {
-      // Not enough to cover debt + interest — give actionable error
-      const shortfall = Math.max(debtUi * 1.002 - walletBalance, 0.000001);
-      throw new Error(
-        `Insufficient ${meta.symbol} to fully repay. Debt: ~${debtUi.toFixed(meta.decimals)} ${meta.symbol}, ` +
-        `balance: ${walletBalance} ${meta.symbol}. ` +
-        `Get ~${shortfall.toFixed(meta.decimals)} more, then: sol lend repay max ${token}`
-      );
+  if (proto) {
+    const provider = getProvider(proto);
+    if (!provider.capabilities.repay || !provider.repay) {
+      throw new Error(`${provider.name} does not support repayment.`);
     }
-  } else {
-    rawAmount = uiToTokenAmount(amount, meta.decimals).toString();
+    return provider.repay(walletName, token, amount);
   }
 
-  const slot = await getCurrentSlot();
-
-  const action = await KaminoAction.buildRepayTxns(
-    market,
-    rawAmount,
-    kAddress(meta.mint),
-    kSigner(signer),
-    new VanillaObligation(kAddress(KLEND_PROGRAM_ID)),
-    true,
-    undefined,
-    slot,
-    undefined, // payer (defaults to owner)
-    300_000,
-    true,
+  // Auto-select: find which protocol has a borrow for this token
+  const signer = await loadSigner(walletName);
+  const allPositions = await getPositions(signer.address);
+  const tokenUpper = token.toUpperCase();
+  const borrows = allPositions.filter(p =>
+    p.type === 'borrow' && p.token.toUpperCase() === tokenUpper
   );
 
-  const instructions = toV2Instructions(KaminoAction.actionToIxs(action));
+  if (borrows.length === 0) {
+    throw new Error(`No ${token} borrow found. Check with: sol lend positions`);
+  }
 
-  const prices = await getPrices([meta.mint]);
-  const price = prices.get(meta.mint)?.priceUsd;
+  const protos = [...new Set(borrows.map(b => b.protocol))];
+  if (protos.length === 1) {
+    const provider = getProvider(protos[0]);
+    if (!provider.repay) throw new Error(`${provider.name} does not support repayment.`);
+    return provider.repay(walletName, token, amount);
+  }
 
-  const result = await buildAndSendTransaction(instructions, signer, {
-    txType: 'lend-repay',
-    walletName,
-    fromMint: meta.mint,
-    fromAmount: rawAmount,
-    fromPriceUsd: price,
-  });
-
-  invalidateMarketCache();
-
-  // Fetch remaining debt (best-effort)
-  let remainingDebt: number | undefined;
-  try {
-    const updated = await loadMarket();
-    const obligation = await updated.getObligationByWallet(
-      kAddress(signer.address),
-      new VanillaObligation(kAddress(KLEND_PROGRAM_ID)),
-    );
-    if (obligation) {
-      const borrowPos = obligation.getBorrowByMint(kAddress(meta.mint));
-      if (borrowPos) {
-        remainingDebt = borrowPos.amount.toNumber() / Math.pow(10, meta.decimals);
-      } else {
-        remainingDebt = 0;
-      }
-    }
-  } catch { /* non-critical */ }
-
-  return {
-    signature: result.signature,
-    explorerUrl: result.explorerUrl,
-    remainingDebt,
-  };
+  throw new Error(
+    `${token} borrows found on multiple protocols: ${protos.join(', ')}. ` +
+    `Specify one with --protocol, e.g.: sol lend repay ${amount} ${token} --protocol ${protos[0]}`
+  );
 }

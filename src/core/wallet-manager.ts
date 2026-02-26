@@ -109,6 +109,15 @@ export async function loadSigner(name: string): Promise<KeyPairSigner> {
   return createKeyPairSignerFromBytes(keypairBytes);
 }
 
+/** Return raw 64-byte keypair (private+public) for v1 SDK compat. */
+export function loadSignerRawBytes(name: string): Uint8Array {
+  const wallet = walletRepo.getWallet(name);
+  if (!wallet) {
+    throw new Error(`Wallet "${name}" not found`);
+  }
+  return readKeyFile(wallet.file_path);
+}
+
 export function resolveWalletName(nameOrAddress: string): string {
   const byName = walletRepo.getWallet(nameOrAddress);
   if (byName) return byName.name;

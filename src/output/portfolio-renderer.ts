@@ -187,8 +187,9 @@ export function renderPortfolio(report: PortfolioReport): string {
     const claimableCount = predictPositions.filter(p => p.extra?.claimable).length;
     sections.push(buildTableSection('Predictions', {
       rows: predictPositions.map(p => {
-        const title = String(p.extra?.marketTitle || p.extra?.eventTitle || '');
-        const shortTitle = title.length > 35 ? title.slice(0, 34) + '\u2026' : title;
+        const eventTitle = String(p.extra?.eventTitle || '');
+        const marketTitle = String(p.extra?.marketTitle || '');
+        const shortTitle = predictLabel(eventTitle, marketTitle, 35);
         const cost = p.extra?.costBasis as number ?? 0;
         const pnl = p.extra?.unrealizedPnl as number ?? null;
         const pnlStr = pnl != null ? `${pnl >= 0 ? '+' : ''}$${fmt(pnl)}` : '\u2014';
@@ -374,4 +375,16 @@ function miniBar(pct: number): string {
   const empty = FILL_BAR_WIDTH - filled;
   const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
   return `${bar} ${pct.toFixed(0)}%`;
+}
+
+function predictLabel(eventTitle: string, marketTitle: string, maxLen: number): string {
+  if (!eventTitle) return marketTitle.length > maxLen ? marketTitle.slice(0, maxLen - 1) + '\u2026' : (marketTitle || '\u2014');
+  if (!marketTitle || eventTitle === marketTitle) {
+    return eventTitle.length > maxLen ? eventTitle.slice(0, maxLen - 1) + '\u2026' : eventTitle;
+  }
+  const suffix = ` \u2014 ${marketTitle}`;
+  const budget = maxLen - suffix.length;
+  if (budget < 10) return eventTitle.length > maxLen ? eventTitle.slice(0, maxLen - 1) + '\u2026' : eventTitle;
+  const short = eventTitle.length > budget ? eventTitle.slice(0, budget - 1) + '\u2026' : eventTitle;
+  return short + suffix;
 }
