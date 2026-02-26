@@ -215,17 +215,11 @@ export function renderPortfolio(report: PortfolioReport): string {
     }, claimableCount > 0 ? `  ${claimableCount} claimable \u2014 sol predict positions` : undefined));
   }
 
-  // ── Allocation (not a table — raw lines) ──
-  if (report.allocation.length > 0) {
-    const maxSymLen = Math.max(...report.allocation.map(a => a.symbol.length), 4);
-    const allocLines = report.allocation.map(a => {
-      const filled = Math.round((a.pct / 100) * 30);
-      const empty = 30 - filled;
-      const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
-      const pctStr = `${a.pct.toFixed(1)}%`.padStart(6);
-      return `${a.symbol.padEnd(maxSymLen)}  ${bar} ${pctStr}`;
-    });
-    sections.push({ title: 'Allocation', body: allocLines.join('\n') });
+  // ── Allocation (placeholder — rebuilt at panel width) ──
+  const hasAllocation = report.allocation.length > 0;
+  const allocSectionIndex = hasAllocation ? sections.length : -1;
+  if (hasAllocation) {
+    sections.push({ title: 'Allocation', body: '' }); // rebuilt below
   }
 
   // ── Wallets (only if multiple) ──
@@ -238,18 +232,14 @@ export function renderPortfolio(report: PortfolioReport): string {
     }
     const walletRows = [...walletTotals.entries()]
       .sort((a, b) => b[1] - a[1])
-      .map(([name, value]) => {
-        const addr = walletAddressMap.get(name) ?? '';
-        const shortAddr = addr.length > 12 ? `${addr.slice(0, 4)}..${addr.slice(-4)}` : addr;
-        return {
-          wallet: name,
-          address: shortAddr,
-          value: `$${fmt(value)}`,
-          pct: report.totalValueUsd > 0
-            ? `${((value / report.totalValueUsd) * 100).toFixed(1)}%`
-            : '',
-        };
-      });
+      .map(([name, value]) => ({
+        wallet: name,
+        address: walletAddressMap.get(name) ?? '',
+        value: `$${fmt(value)}`,
+        pct: report.totalValueUsd > 0
+          ? `${((value / report.totalValueUsd) * 100).toFixed(1)}%`
+          : '',
+      }));
     sections.push(buildTableSection('Wallets', {
       rows: walletRows,
       columns: [
@@ -270,6 +260,21 @@ export function renderPortfolio(report: PortfolioReport): string {
     if (section.tableSpec) {
       section.body = table(section.tableSpec.rows, section.tableSpec.columns, { minWidth: width });
     }
+  }
+
+  // Build allocation bars scaled to panel width
+  if (hasAllocation) {
+    const maxSymLen = Math.max(...report.allocation.map(a => a.symbol.length), 4);
+    const pctColWidth = 6; // " XX.X%"
+    const barWidth = width - maxSymLen - 2 - 1 - pctColWidth; // symbol  bar pct
+    const allocLines = report.allocation.map(a => {
+      const filled = Math.round((a.pct / 100) * barWidth);
+      const empty = barWidth - filled;
+      const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
+      const pctStr = `${a.pct.toFixed(1)}%`.padStart(pctColWidth);
+      return `${a.symbol.padEnd(maxSymLen)}  ${bar} ${pctStr}`;
+    });
+    sections[allocSectionIndex].body = allocLines.join('\n');
   }
 
   // ── Assemble output ────────────────────────────────────
