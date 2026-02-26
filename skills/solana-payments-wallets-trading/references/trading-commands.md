@@ -67,16 +67,17 @@ Browse results are recycled into the local token cache, so `sol token info` and 
 sol token swap <amount> <from> <to>
 ```
 
-Swaps tokens via Jupiter aggregator — best price across all Solana DEXes.
+Swaps tokens by querying all registered routers in parallel and picking the best price. Currently supports Jupiter and DFlow.
 
 ### Examples
 
 ```bash
-sol token swap 50 usdc bonk               # buy BONK with USDC
+sol token swap 50 usdc bonk               # buy BONK — best price wins
 sol token swap 1.5 sol usdc               # sell SOL for USDC
 sol token swap 100 usdc sol --wallet bot   # from a specific wallet
 sol token swap 50 usdc bonk --quote-only   # preview without executing
 sol token swap 50 usdc bonk --slippage 100 # 1% slippage (100 bps)
+sol token swap 50 usdc bonk --router jupiter  # force a specific router
 sol token swap 50 usdc bonk --yes          # skip confirmation
 ```
 
@@ -85,6 +86,7 @@ sol token swap 50 usdc bonk --yes          # skip confirmation
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--slippage <bps>` | 50 | Slippage tolerance in basis points (50 = 0.5%) |
+| `--router <name>` | best | Router: `best`, `jupiter`, `dflow` |
 | `--quote-only` | false | Show quote without executing |
 | `--wallet <name>` | default | Wallet to swap from |
 | `--yes` | false | Skip confirmation prompt |
@@ -257,6 +259,83 @@ sol token close --all --burn --yes        # burn dust + close all
 | `--burn` | Burn remaining dust before closing |
 | `--wallet <name>` | Wallet to close accounts in |
 | `--yes` | Skip confirmation |
+
+## DCA (Dollar-Cost Average)
+
+```bash
+sol token dca new <amount> <from> <to> --every <interval> --count <n>
+sol token dca list
+sol token dca cancel <orderKey>
+```
+
+Create recurring swap orders using Jupiter's Recurring API.
+
+### Examples
+
+```bash
+sol token dca new 500 usdc sol --every day --count 10     # buy SOL daily for 10 days
+sol token dca new 1000 usdc bonk --every hour --count 20  # hourly BONK buys
+sol token dca new 500 usdc sol --every day --count 10 --quote-only  # preview
+sol token dca list                                         # active orders
+sol token dca list --history                               # past orders
+sol token dca cancel <orderKey>                            # cancel an order
+```
+
+### Flags (new)
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--every <interval>` | required | Interval: `minute`, `hour`, `day`, `week`, `month` |
+| `--count <n>` | 10 | Number of orders |
+| `--wallet <name>` | default | Wallet to use |
+| `--quote-only` | false | Preview without executing |
+
+### Constraints
+
+- Total value >= $100 USD
+- At least 2 orders
+- Each order >= $50 USD
+
+## Limit Orders
+
+```bash
+sol token limit new <amount> <from> <to> --at <targetPrice>
+sol token limit list
+sol token limit cancel <orderKey>
+```
+
+Place limit orders using Jupiter's Trigger API. The order fills when the output token reaches your target USD price.
+
+### Examples
+
+```bash
+sol token limit new 50 usdc bonk --at 0.000003     # buy BONK at $0.000003
+sol token limit new 0.5 sol usdc --at 0.90          # buy USDC at $0.90/USDC
+sol token limit new 50 usdc bonk --at 0.000003 --quote-only  # preview
+sol token limit list                                 # active orders
+sol token limit list --history                       # filled/cancelled
+sol token limit cancel <orderKey>                    # cancel an order
+```
+
+### Flags (new)
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--at <price>` | required | Target USD price for the output token |
+| `--slippage <bps>` | 0 | Slippage tolerance (0 = exact fill only) |
+| `--wallet <name>` | default | Wallet to use |
+| `--quote-only` | false | Preview without executing |
+
+### How target price works
+
+You specify the USD price at which you want to acquire the output token. The CLI calculates the output amount:
+`outputAmount = (inputAmount * inputPriceUsd) / targetPriceUsd`
+
+If the target price is above the current market price, the order may fill immediately.
+
+### Constraints
+
+- Minimum order size: $5 USD
 
 ## Sync Token Cache
 

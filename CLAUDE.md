@@ -7,7 +7,7 @@ A Solana CLI that reads like English: `sol token swap 50 usdc bonk`, `sol stake 
 ## Design Principles
 
 ### Natural language commands
-Commands should read like what you'd say out loud. Prefer `sol token swap 50 usdc bonk` over `sol swap --from usdc --to bonk --amount 50`. Positional args for the common case, flags for overrides.
+Commands should read like what you'd say out loud. Prefer `sol token swap 50 usdc bonk` over `sol swap --from usdc --to bonk --amount 50`. Positional args for the common case, flags for overrides. Think: self documenting features: the example syntax should explain what the function does and how to operate it.
 
 ### Model user intent, not on-chain mechanics
 Commands map to what the user wants to do, not the underlying Solana instructions. The user wants to "stake" — they don't care that it's create + initialize + delegate. They want to "withdraw" — they don't care about deactivate vs split vs withdraw depending on state. Hide the protocol complexity behind a single verb. Batch multiple on-chain steps into one transaction wherever possible. But do mention the process in help text to avoid too much "magic" — e.g. `sol stake new <amount>` description says "Creates a stake account, funds it and delegates in a single tx".
@@ -19,7 +19,7 @@ After output, tell the user what they can do next. `stake list` reminds about cl
 Implement functionality directly via RPC and on-chain programs. Don't require API keys for core features. The Jupiter API is acceptable for swaps (it's free, keyless), but core operations like staking, transfers, and token info should work with just an RPC endpoint.
 
 ### Smart defaults, easy overrides
-Default validator is Solana Compass. Default wallet is the first one created. Default slippage is 50 bps. All overridable with flags. A new user should be able to `sol wallet create && sol stake new 10` without configuring anything beyond an RPC.
+Default validator is Solana Compass. Default wallet is the first one created. Default slippage is 50 bps. Default router is `best`. All overridable with flags. A new user should be able to `sol wallet create && sol stake new 10` without configuring anything beyond an RPC.
 
 ## Architecture
 
@@ -92,6 +92,31 @@ const { result, elapsed_ms } = await timed(() => doWork());
 - Transaction pipeline: `pipe(createTransactionMessage, setFeePayer, setBlockhash, appendInstructions)` then `signTransactionMessageWithSigners` then `getBase64EncodedWireTransaction`.
 - All instruction builders come from `@solana-program/*` packages (system, token, stake).
 - Jupiter swap txs arrive pre-built as base64 — decode, sign, re-encode, send via `sendEncodedTransaction()`.
+- For pre-built transactions (Jupiter orders, lend), inject the signer before signing: `Object.assign({}, msg, { feePayer: signer })`.
+
+## Swap Router Abstraction
+
+Swaps go through a pluggable router interface (`src/core/swap-router.ts`). Each router implements `SwapRouter` (getQuote + getSwapTransaction) and self-registers on import.
+
+**Routers:**
+- `jupiter` — Jupiter Swap API. Works without API key (falls back to `lite-api.jup.ag`). Always available.
+- `dflow` — DFlow Trading API (`quote-api.dflow.net`). Requires API key: `sol config set api.dflowApiKey <key>`.
+
+**Selection:** `--router best` (default) queries all routers in parallel, picks highest output amount. If one fails (e.g. no DFlow key), silently falls back. Use `--router jupiter` or `--router dflow` to force a specific router. Default can be set via `sol config set defaults.router <name>`.
+
+**Adding a new router:** Create `src/core/xxx-router.ts` implementing `SwapRouter`, call `registerRouter()` at module level, and add a side-effect import in `swap-service.ts`.
+
+## DCA & Limit Orders
+
+DCA and limit orders use Jupiter's Recurring and Trigger APIs (`src/core/order-service.ts`). Commands live in `src/commands/token-orders.ts`, registered as subcommands of `sol token`.
+
+**Signing pre-built order transactions:** Jupiter returns unsigned base64 transactions. Use the `signAndExecute()` pattern: decode → decompile → inject signer via `Object.assign({}, msg, { feePayer: signer })` → sign → encode → POST to `/execute`.
+
+**DCA constraints:** $100 total minimum, 2+ orders, $50/order minimum. Intervals: minute, hour, day, week, month.
+
+**Limit order constraints:** $5 minimum order size. Target price is USD price of the output token. We calculate `outputAmount = (inputAmount * inputPriceUsd) / targetPriceUsd`.
+
+**Transaction logging:** Orders log to `transaction_log` with types `dca_create`, `dca_cancel`, `limit_create`, `limit_cancel`.
 
 ## Adding a New Command
 

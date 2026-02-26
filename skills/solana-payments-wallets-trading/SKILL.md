@@ -86,19 +86,47 @@ See references/trading-commands.md for all categories and flags.
 
 ## Buy and Sell Tokens
 
-Swap any token for any other token. Prices come from Jupiter — best
-rate across every Solana DEX, no API key needed.
+Swap any token for any other token. Queries Jupiter and DFlow in
+parallel and picks the best price automatically.
 
 ```bash
-sol token swap 50 usdc bonk             # buy BONK with USDC
-sol token swap 1.5 sol usdc             # sell SOL for USDC
+sol token swap 50 usdc bonk               # buy BONK — best price wins
+sol token swap 1.5 sol usdc               # sell SOL for USDC
 sol token swap 50 usdc bonk --quote-only  # preview without executing
+sol token swap 50 usdc bonk --router jupiter  # force a specific router
 ```
 
 Every swap records the price at execution time, so you can track
 cost basis and P&L later.
 
 See references/trading-commands.md for slippage, wallet selection, etc.
+
+## DCA (Dollar-Cost Averaging)
+
+Set up recurring buys that execute automatically over time.
+
+```bash
+sol token dca new 500 usdc sol --every day --count 10   # buy SOL daily
+sol token dca new 1000 usdc bonk --every hour --count 20
+sol token dca list                           # see active DCA orders
+sol token dca cancel <orderKey>              # stop a DCA
+```
+
+Constraints: $100 total minimum, at least 2 orders, $50/order minimum.
+Intervals: minute, hour, day, week, month.
+
+## Limit Orders
+
+Place orders that execute when a token hits your target price.
+
+```bash
+sol token limit new 50 usdc bonk --at 0.000003   # buy BONK at $0.000003
+sol token limit new 0.5 sol usdc --at 0.90        # buy USDC at $0.90
+sol token limit list                              # see active orders
+sol token limit cancel <orderKey>                 # cancel an order
+```
+
+Use `--quote-only` to preview the order plan without placing it.
 
 ## Check Prices
 
@@ -242,7 +270,7 @@ canExportWallet = false
 | Permission | Gated subcommands |
 |---|---|
 | `canTransfer` | `token send` |
-| `canSwap` | `token swap`, `token close --all` |
+| `canSwap` | `token swap`, `token close --all`, `token dca new/cancel`, `token limit new/cancel` |
 | `canStake` | `stake new` |
 | `canWithdrawStake` | `stake withdraw`, `stake claim-mev` |
 | `canLend` | `lend deposit`, `lend borrow` |

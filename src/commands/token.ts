@@ -14,6 +14,7 @@ import { getTransferSolInstruction } from '@solana-program/system';
 import { getBurnCheckedInstruction, getCloseAccountInstruction } from '@solana-program/token';
 import * as walletRepo from '../db/repos/wallet-repo.js';
 import { getCategories, browseTokens } from '../core/token-lists.js';
+import { registerOrderCommands } from './token-orders.js';
 
 export function registerTokenCommand(program: Command): void {
   const token = program.command('token').description('Token operations');
@@ -204,8 +205,9 @@ export function registerTokenCommand(program: Command): void {
 
   if (isPermitted('canSwap')) token
     .command('swap <amount> <from> <to>')
-    .description('Swap tokens via Jupiter (e.g., sol token swap 1.5 SOL USDC)')
+    .description('Swap tokens (e.g., sol token swap 1.5 SOL USDC)')
     .option('--slippage <bps>', 'Slippage tolerance in basis points', parseInt)
+    .option('--router <name>', 'Router to use: best, jupiter, dflow (default: best)')
     .option('--quote-only', 'Show quote without executing')
     .option('--wallet <name>', 'Wallet to use')
     .option('--yes', 'Skip confirmation')
@@ -215,18 +217,18 @@ export function registerTokenCommand(program: Command): void {
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
 
         const { result: quote, elapsed_ms } = await timed(() =>
-          getQuote(from, to, amount, { slippageBps: opts.slippage })
+          getQuote(from, to, amount, { slippageBps: opts.slippage, router: opts.router })
         );
 
         if (opts.quoteOnly) {
           if (isJsonMode()) {
-            const { _raw, ...quoteData } = quote;
+            const { _raw, _routerName, ...quoteData } = quote;
             output(success(quoteData, { elapsed_ms }));
           } else {
             console.log(`Swap Quote:`);
             console.log(`  ${quote.inputUiAmount} ${quote.inputSymbol} → ${quote.outputUiAmount.toFixed(6)} ${quote.outputSymbol}`);
             console.log(`  Price impact: ${quote.priceImpactPct.toFixed(4)}%`);
-            console.log(`  Route: ${quote.routePlan}`);
+            console.log(`  Route: ${quote.routePlan} (via ${quote.routerName})`);
             console.log(`  Slippage: ${quote.slippageBps / 100}%`);
           }
           return;
@@ -236,11 +238,11 @@ export function registerTokenCommand(program: Command): void {
         if (!opts.yes && !isJsonMode()) {
           console.log(`Swap: ${quote.inputUiAmount} ${quote.inputSymbol} → ${quote.outputUiAmount.toFixed(6)} ${quote.outputSymbol}`);
           console.log(`  Price impact: ${quote.priceImpactPct.toFixed(4)}%`);
-          console.log(`  Route: ${quote.routePlan}`);
+          console.log(`  Route: ${quote.routePlan} (via ${quote.routerName})`);
         }
 
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
-        const result = await executeSwap(from, to, amount, walletName, { slippageBps: opts.slippage });
+        const result = await executeSwap(from, to, amount, walletName, { slippageBps: opts.slippage, router: opts.router });
 
         if (isJsonMode()) {
           output(success(result, { elapsed_ms }));
@@ -643,6 +645,9 @@ export function registerTokenCommand(program: Command): void {
         process.exitCode = 1;
       }
     });
+
+  // ── DCA & Limit Orders ──────────────────────────────────────
+  registerOrderCommands(token);
 }
 
 function fmtVolume(v: number): string {

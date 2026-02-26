@@ -18,9 +18,9 @@ export interface Permissions {
 
 export interface SolConfig {
   rpc?: { url?: string };
-  api?: { jupiterApiKey?: string };
+  api?: { jupiterApiKey?: string; dflowApiKey?: string };
   onramp?: { provider?: string; transakApiKey?: string; sphereKey?: string };
-  defaults?: { wallet?: string; slippageBps?: number; priorityFee?: string };
+  defaults?: { wallet?: string; slippageBps?: number; priorityFee?: string; router?: string };
   permissions?: Permissions;
   [key: string]: unknown;
 }
