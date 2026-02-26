@@ -192,14 +192,19 @@ See references/lending-commands.md for full details.
 
 ## Track How Your Portfolio Is Doing
 
-See everything in one place — tokens, staked SOL, lending positions.
+See everything in one place — tokens, staked SOL, lending positions,
+and open orders.
 
 ```bash
 sol portfolio                           # the full picture
-sol portfolio snapshot --label "monday"
 sol portfolio compare                   # what changed since last snapshot
 sol portfolio pnl                       # profit and loss over time
 ```
+
+The portfolio view includes active DCA and limit orders with fill
+progress, so locked capital is always visible. A snapshot is taken
+automatically on each view (rate-limited to every 5 minutes), so
+`sol portfolio compare` always has recent data.
 
 See references/portfolio-commands.md for snapshot management.
 

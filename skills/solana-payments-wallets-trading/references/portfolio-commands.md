@@ -7,8 +7,17 @@ sol portfolio
 sol portfolio --wallet trading
 ```
 
-Unified view of everything you hold — tokens, staked SOL, and lending
-positions — with USD values.
+Unified view of everything you hold — tokens, staked SOL, lending
+positions, and open orders (DCA + limit) — with USD values and
+allocation breakdown.
+
+Active DCA and limit orders appear in the **Open Orders** section
+with a fill percentage showing progress. Locked capital in orders
+counts toward your total and allocation.
+
+A snapshot is taken automatically on each portfolio view
+(rate-limited to once every 5 minutes), so `sol portfolio compare`
+always has recent data to work with.
 
 ### JSON Output
 
@@ -16,31 +25,44 @@ positions — with USD values.
 {
   "ok": true,
   "data": {
+    "wallets": [
+      { "name": "main", "address": "C9dzXf...hVVH" }
+    ],
     "positions": [
       {
         "type": "token",
         "symbol": "SOL",
         "amount": 12.5,
-        "value_usd": 1878.13
+        "valueUsd": 1878.13
       },
       {
         "type": "stake",
         "symbol": "SOL",
         "amount": 10,
-        "value_usd": 1502.50,
-        "validator": "Comp...ass",
-        "status": "active"
+        "valueUsd": 1502.50,
+        "extra": { "validator": "Comp...ass", "status": "active" }
       },
       {
         "type": "lend",
         "symbol": "USDC",
         "amount": 100,
-        "value_usd": 100,
-        "protocol": "kamino",
-        "apy": "8.5%"
+        "valueUsd": 100,
+        "extra": { "side": "deposit", "apy": 0.085 }
+      },
+      {
+        "type": "order",
+        "symbol": "USDC",
+        "amount": 50.5,
+        "valueUsd": 50.5,
+        "extra": {
+          "orderType": "dca",
+          "outputSymbol": "SOL",
+          "fillPct": 50,
+          "status": "active"
+        }
       }
     ],
-    "total_value_usd": 3480.63
+    "totalValueUsd": 3480.63
   },
   "meta": { "elapsed_ms": 2500 }
 }
@@ -63,7 +85,9 @@ Saves the current portfolio state to SQLite for later comparison.
 | `--label <text>` | Human-readable label for the snapshot |
 | `--wallet <name>` | Snapshot a specific wallet only |
 
-Snapshots include ALL position types — tokens, stakes, and lending.
+Snapshots include ALL position types — tokens, stakes, lending, and
+open orders. You usually don't need to run this manually since
+`sol portfolio` auto-snapshots on every view.
 
 ## List Snapshot History
 
