@@ -5,7 +5,7 @@ import { output, success, failure, isJsonMode, timed } from '../output/formatter
 import { explorerUrl } from '../utils/solana.js';
 
 export function registerFetchCommand(program: Command): void {
-  if (!isPermitted('canPay')) return;
+  if (!isPermitted('canFetch')) return;
 
   program
     .command('fetch <url>')

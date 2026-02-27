@@ -16,7 +16,7 @@ export interface Permissions {
   canRemoveWallet?: boolean;
   canExportWallet?: boolean;
   canPredict?: boolean;
-  canPay?: boolean;
+  canFetch?: boolean;
 }
 
 export interface SolConfig {

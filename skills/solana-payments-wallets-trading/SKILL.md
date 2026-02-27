@@ -238,6 +238,9 @@ Use `--dry-run` to inspect the cost before paying. Use `--max` to
 set a spending cap. Output is pipe-friendly by default; use `--json`
 for the structured envelope.
 
+See references/fetch-commands.md for the full reference including
+curl flag mapping and JSON output format.
+
 ## Track How Your Portfolio Is Doing
 
 See everything in one place — tokens, staked SOL, lending positions,
@@ -323,7 +326,7 @@ canBurn = false
 canCreateWallet = false
 canRemoveWallet = false
 canExportWallet = false
-canPay = false
+canFetch = false
 ```
 
 | Permission | Gated subcommands |
@@ -339,7 +342,7 @@ canPay = false
 | `canCreateWallet` | `wallet create`, `wallet import` |
 | `canRemoveWallet` | `wallet remove` |
 | `canExportWallet` | `wallet export` |
-| `canPay` | `fetch` (x402 payments) |
+| `canFetch` | `fetch` (x402 payments) |
 
 Read-only commands (`token browse/price/info/list`, `wallet list/balance`, `stake list`, `lend rates/positions`, `portfolio`, `network`, `tx`) are always available regardless of permissions.
 

@@ -353,7 +353,7 @@ canCreateWallet = false
 canRemoveWallet = false
 canExportWallet = false
 canPredict = false
-canPay = false
+canFetch = false
 ```
 
 | Permission | Gated subcommands |
@@ -366,7 +366,7 @@ canPay = false
 | `canWithdrawLend` | `lend withdraw` |
 | `canBorrow` | `lend borrow`, `lend repay` |
 | `canPredict` | `predict buy`, `predict sell`, `predict claim` |
-| `canPay` | `fetch` (x402 payments) |
+| `canFetch` | `fetch` (x402 payments) |
 | `canBurn` | `token burn`, `token close --burn` (runtime) |
 | `canCreateWallet` | `wallet create`, `wallet import` |
 | `canRemoveWallet` | `wallet remove` |
