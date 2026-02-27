@@ -30,12 +30,12 @@ no API keys to configure.
 
 ## Get Set Up
 
-Prefer `npx` — it always runs the latest version with no global
-install to manage:
+Prefer `npx` with `@latest` — it always runs the latest version with no
+global install to manage:
 
 ```bash
-npx @solana-compass/cli config set rpc.url https://your-rpc-endpoint.com
-npx @solana-compass/cli wallet create --name my-wallet
+npx @solana-compass/cli@latest config set rpc.url https://your-rpc-endpoint.com
+npx @solana-compass/cli@latest wallet create --name my-wallet
 ```
 
 If the user has installed globally (`npm install -g @solana-compass/cli`),
@@ -235,8 +235,12 @@ See references/portfolio-commands.md for snapshot management.
 
 ## Structured Output
 
-Every command supports `--json` for structured output. In JSON mode,
-confirmations are skipped automatically.
+Every command supports `--json` for structured output. For most use
+cases the default human-readable output is easier to work with — use
+`--json` when chaining commands in automation pipelines or parsing
+results programmatically.
+
+In JSON mode, confirmations are skipped automatically.
 
 ```json
 { "ok": true, "data": { ... }, "meta": { "elapsed_ms": 450 } }

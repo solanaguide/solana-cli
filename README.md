@@ -38,7 +38,7 @@ npm install -g @solana-compass/cli
 Or run without installing:
 
 ```bash
-npx @solana-compass/cli wallet list
+npx @solana-compass/cli@latest wallet list
 ```
 
 Requires Node.js >= 20.
@@ -234,7 +234,7 @@ sol tx 4xK9...abc                             # Look up a transaction by signatu
 
 ## Structured Output
 
-Every command supports `--json` for automation and scripting:
+Every command supports `--json` for structured output. For most use cases — including LLM agents — the default human-readable output is easier to work with. Use `--json` when you need to chain commands in automation pipelines or parse results programmatically.
 
 ```json
 {
@@ -244,7 +244,7 @@ Every command supports `--json` for automation and scripting:
 }
 ```
 
-Error codes are predictable `UPPER_SNAKE_CASE` identifiers (`SWAP_FAILED`, `LEND_DEPOSIT_FAILED`, etc.).
+In JSON mode, confirmations are skipped automatically. Error codes are predictable `UPPER_SNAKE_CASE` identifiers (`SWAP_FAILED`, `LEND_DEPOSIT_FAILED`, etc.).
 
 ---
 
