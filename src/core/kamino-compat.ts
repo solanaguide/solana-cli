@@ -1,4 +1,4 @@
-import { address, type IInstruction } from '@solana/kit';
+import { address, type Instruction } from '@solana/kit';
 import { getRpc } from './rpc.js';
 import { verbose } from '../output/formatter.js';
 
@@ -34,11 +34,11 @@ export function kSigner(signer: any): any {
 }
 
 /**
- * Convert klend-sdk Instruction[] to kit v2 IInstruction[].
+ * Convert klend-sdk Instruction[] to kit v2 Instruction[].
  * The shapes are identical at runtime — this is a type-level bridge.
  */
-export function toV2Instructions(ixs: any[]): IInstruction[] {
-  return ixs as IInstruction[];
+export function toV2Instructions(ixs: any[]): Instruction[] {
+  return ixs as Instruction[];
 }
 
 /** Fetch current slot as bigint (klend-sdk expects Slot = bigint). */

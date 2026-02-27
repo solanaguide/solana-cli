@@ -271,7 +271,7 @@ async function signAndSend(
 
   // Sign with our wallet — returns { address: signature } dict
   verbose('Signing prediction transaction...');
-  const [newSigs] = await signer.signTransactions([rawTx]);
+  const [newSigs] = await signer.signTransactions([rawTx as Parameters<typeof signer.signTransactions>[0][0]]);
 
   // Merge our signature into the existing signatures
   const mergedSigs = { ...rawTx.signatures } as Record<string, unknown>;

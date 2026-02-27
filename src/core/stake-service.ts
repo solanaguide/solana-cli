@@ -1,4 +1,4 @@
-import { address, generateKeyPairSigner, type IInstruction } from '@solana/kit';
+import { address, generateKeyPairSigner, type Instruction } from '@solana/kit';
 import { getCreateAccountInstruction } from '@solana-program/system';
 import {
   STAKE_PROGRAM_ADDRESS,
@@ -137,7 +137,7 @@ export async function createAndDelegateStake(
   verbose(`Creating stake account ${stakeAccountSigner.address}`);
   verbose(`Rent exempt: ${rentExempt}, stake: ${stakeLamports}, total: ${totalLamports}`);
 
-  const instructions: IInstruction[] = [
+  const instructions: Instruction[] = [
     // 1. Create account owned by stake program
     getCreateAccountInstruction({
       payer: signer,
@@ -325,7 +325,7 @@ async function partialWithdraw(
   // Split requires the destination account to exist (system create with 0 lamports, stake program owner)
   const rentExempt = await rpc.getMinimumBalanceForRentExemption(STAKE_ACCOUNT_SIZE).send();
 
-  const instructions: IInstruction[] = [
+  const instructions: Instruction[] = [
     // Create the split destination account
     getCreateAccountInstruction({
       payer: signer,

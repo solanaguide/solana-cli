@@ -1,4 +1,4 @@
-import { type IInstruction } from '@solana/kit';
+import { type Instruction } from '@solana/kit';
 import {
   KaminoMarket,
   KaminoAction,

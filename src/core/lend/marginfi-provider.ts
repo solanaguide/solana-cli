@@ -2,8 +2,8 @@ import { MarginfiClient, getConfig, type MarginfiAccountWrapper } from '@mrgnlab
 import { PublicKey, Keypair, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import {
   generateKeyPairSigner,
-  type IInstruction,
-  type IAccountMeta,
+  type Instruction,
+  type AccountMeta,
   address as kitAddress,
 } from '@solana/kit';
 import { getV1Connection, DummyWallet, toV2Instructions } from './marginfi-compat.js';
@@ -72,7 +72,7 @@ async function getExistingAccount(
  * Build create-account instructions with a v2-compatible ephemeral signer.
  * Returns both the v2 instructions (with signer injected) and the ephemeral signer.
  */
-async function buildCreateAccountIxs(client: MarginfiClient): Promise<IInstruction[]> {
+async function buildCreateAccountIxs(client: MarginfiClient): Promise<Instruction[]> {
   const ephemeral = await generateKeyPairSigner();
   const { instructions } = await client.makeCreateMarginfiAccountIx(
     new PublicKey(ephemeral.address),
@@ -83,7 +83,7 @@ async function buildCreateAccountIxs(client: MarginfiClient): Promise<IInstructi
   const v2Ixs = toV2Instructions(instructions);
   return v2Ixs.map(ix => ({
     ...ix,
-    accounts: (ix.accounts ?? []).map((acc: IAccountMeta) => {
+    accounts: (ix.accounts ?? []).map((acc: AccountMeta) => {
       if (acc.address === ephemeral.address && (acc.role === 2 || acc.role === 3)) {
         return { ...acc, signer: ephemeral } as any;
       }

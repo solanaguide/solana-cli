@@ -1,5 +1,5 @@
 import { Connection, Keypair, PublicKey, Transaction, VersionedTransaction, type TransactionInstruction } from '@solana/web3.js';
-import { type IInstruction, type IAccountMeta, address } from '@solana/kit';
+import { type Instruction, type AccountMeta, address } from '@solana/kit';
 import { getRpcUrl } from '../rpc.js';
 
 // ── v1 Connection factory ────────────────────────────────
@@ -32,13 +32,13 @@ export class DummyWallet {
 
 // ── Instruction conversion ───────────────────────────────
 
-export function toV2Instructions(ixs: TransactionInstruction[]): IInstruction[] {
+export function toV2Instructions(ixs: TransactionInstruction[]): Instruction[] {
   return ixs.map(ix => ({
     programAddress: address(ix.programId.toBase58()),
     accounts: ix.keys.map(key => ({
       address: address(key.pubkey.toBase58()),
       role: accountRole(key.isSigner, key.isWritable),
-    } as IAccountMeta)),
+    } as AccountMeta)),
     data: ix.data,
   }));
 }

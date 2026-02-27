@@ -7,7 +7,7 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
   appendTransactionMessageInstructions,
   type TransactionSigner,
-  type IInstruction,
+  type Instruction,
   type Rpc,
   type SolanaRpcApi,
 } from '@solana/kit';
@@ -123,9 +123,9 @@ export interface SendResult {
  * entries to find signers, so we inject them here.
  */
 function injectSigners(
-  instructions: IInstruction[],
+  instructions: Instruction[],
   signers: TransactionSigner[],
-): IInstruction[] {
+): Instruction[] {
   const signerMap = new Map(signers.map(s => [s.address, s]));
   return instructions.map(ix => ({
     ...ix,
@@ -139,7 +139,7 @@ function injectSigners(
 }
 
 export async function buildAndSendTransaction(
-  instructions: IInstruction[],
+  instructions: Instruction[],
   payer: TransactionSigner,
   opts: {
     maxRetries?: number;

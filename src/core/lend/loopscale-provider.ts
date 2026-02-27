@@ -25,7 +25,7 @@ const APY_DIVISOR = 1_000_000;
 
 // ── HTTP helper ──────────────────────────────────────────
 
-async function loopscaleFetch(
+export async function loopscaleFetch(
   path: string,
   body?: Record<string, any>,
   walletAddress?: string,
@@ -66,7 +66,7 @@ async function symbolForMint(mint: string): Promise<string> {
 
 // ── Vault cache ──────────────────────────────────────────
 
-interface VaultInfo {
+export interface VaultInfo {
   address: string;
   principalMint: string;
   symbol: string;
@@ -112,7 +112,7 @@ interface RawVaultEntry {
 let vaultCache: VaultInfo[] = [];
 let vaultCacheTs = 0;
 
-async function fetchVaults(): Promise<VaultInfo[]> {
+export async function fetchVaults(): Promise<VaultInfo[]> {
   if (Date.now() - vaultCacheTs < VAULT_CACHE_TTL_MS && vaultCache.length > 0) {
     return vaultCache;
   }
@@ -190,20 +190,20 @@ async function fetchVaults(): Promise<VaultInfo[]> {
   return vaults;
 }
 
-function findBestVault(vaults: VaultInfo[], mint: string): VaultInfo | undefined {
+export function findBestVault(vaults: VaultInfo[], mint: string): VaultInfo | undefined {
   const matching = vaults.filter(v => v.principalMint === mint);
   if (matching.length === 0) return undefined;
   return matching.reduce((best, v) => v.depositApy > best.depositApy ? v : best);
 }
 
-interface UserVaultPosition {
+export interface UserVaultPosition {
   vaultAddress: string;
   mint: string;
   vaultLpBalance: number;
 }
 
 /** Fetch user's deposit positions via the lending_vaults/user endpoint. */
-async function getUserVaultPositions(walletAddress: string): Promise<UserVaultPosition[]> {
+export async function getUserVaultPositions(walletAddress: string): Promise<UserVaultPosition[]> {
   const resp = await loopscaleFetch('/markets/lending_vaults/user', {
     page: 0,
     pageSize: 50,
@@ -217,7 +217,7 @@ async function getUserVaultPositions(walletAddress: string): Promise<UserVaultPo
 }
 
 /** Convert an LP token balance to the underlying principal amount. */
-function lpToUnderlying(lpBalance: number, vault: VaultInfo): number {
+export function lpToUnderlying(lpBalance: number, vault: VaultInfo): number {
   if (vault.lpSupply <= 0n) return 0;
   const mintFactor = Math.pow(10, vault.decimals);
   const totalAssetsRaw = vault.totalDeposited * mintFactor; // raw units
@@ -234,7 +234,7 @@ function lpToUnderlying(lpBalance: number, vault: VaultInfo): number {
  * signatures were computed over those exact bytes. Decompiling and recompiling
  * would alter the bytes and invalidate them.
  */
-async function signAndSendLoopscaleTx(
+export async function signAndSendLoopscaleTx(
   txObj: { message: string; signatures?: { publicKey: string; signature: string }[] },
   signer: any,
   txOpts?: Parameters<typeof sendEncodedTransaction>[1],
@@ -493,6 +493,7 @@ export class LoopscaleProvider implements LendProvider {
       body.maxAmountLp = Number.MAX_SAFE_INTEGER;
       body.amountPrincipal = 0;
     } else {
+      body.withdrawAll = false;
       body.amountPrincipal = Number(uiToTokenAmount(amount, meta.decimals));
       body.maxAmountLp = Number.MAX_SAFE_INTEGER;
     }

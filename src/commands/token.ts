@@ -9,7 +9,7 @@ import { table } from '../output/table.js';
 import { isValidAddress, solToLamports, uiToTokenAmount, explorerUrl, SOL_MINT } from '../utils/solana.js';
 import { buildAndSendTransaction } from '../core/transaction.js';
 import { isPermitted } from '../core/config-manager.js';
-import { address, type IInstruction } from '@solana/kit';
+import { address, type Instruction } from '@solana/kit';
 import { getTransferSolInstruction } from '@solana-program/system';
 import { getBurnCheckedInstruction, getCloseAccountInstruction } from '@solana-program/token';
 import * as walletRepo from '../db/repos/wallet-repo.js';
@@ -367,7 +367,7 @@ export function registerTokenCommand(program: Command): void {
             if (opts.close) console.log('  + close token account (reclaim rent)');
           }
 
-          const instructions: IInstruction[] = [
+          const instructions: Instruction[] = [
             getBurnCheckedInstruction({
               account: address(tokenAccount.pubkey),
               mint: address(tokenMeta.mint),
@@ -540,7 +540,7 @@ export function registerTokenCommand(program: Command): void {
           const BATCH_SIZE = 20;
           for (let i = 0; i < toProcess.length; i += BATCH_SIZE) {
             const batch = toProcess.slice(i, i + BATCH_SIZE);
-            const instructions: IInstruction[] = [];
+            const instructions: Instruction[] = [];
 
             for (const account of batch) {
               if (account.needsBurn && account.balance !== '0') {
