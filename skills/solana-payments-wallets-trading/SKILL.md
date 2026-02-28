@@ -364,7 +364,7 @@ sol config set limits.maxTransactionUsd 500
 sol config set limits.maxDailyUsd 2000
 
 # 3. Set allowlists
-sol config set allowlist.tokens SOL,USDC,BONK
+sol config set allowlist.tokens So11111111111111111111111111111111111111112,EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v,DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263
 sol config set allowlist.addresses DRtXHDgC312wpNdNCSb8vCoXDcofCJcPHdAynKGz7Vr,7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU
 
 # 4. Review — confirm everything looks right before locking

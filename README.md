@@ -343,7 +343,7 @@ sol config set permissions.canSwap true
 sol config set permissions.canTransfer false
 sol config set limits.maxTransactionUsd 500
 sol config set limits.maxDailyUsd 2000
-sol config set allowlist.tokens SOL,USDC,BONK
+sol config set allowlist.tokens So11111111111111111111111111111111111111112,EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v,DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263
 
 # Review the full security posture
 sol config status
