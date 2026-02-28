@@ -227,7 +227,7 @@ Works like `curl` but handles [x402](https://x402.org) payment flows automatical
 
 Supports both x402 v1 (`X-PAYMENT`) and v2 (`PAYMENT-SIGNATURE`) protocols. The server provides the fee payer and submits the transaction — your wallet only partially signs.
 
-### config — Persistent settings
+### config — Persistent settings and security
 
 ```bash
 sol config set rpc.url https://my-rpc.com     # Set RPC endpoint
@@ -235,6 +235,8 @@ sol config set api.jupiterApiKey YOUR_KEY     # Optional Jupiter API key
 sol config get rpc.url                         # Read a value
 sol config list                                # Show all settings
 sol config path                                # Config file location
+sol config status                              # Security posture overview
+sol config lock                                # Lock security settings
 ```
 
 By default, Sol uses Jupiter's lite API for zero-config operation. In the future it may be necessary to request a free API key from [portal.jup.ag](https://portal.jup.ag).
@@ -327,39 +329,55 @@ src/
 - All transactions are logged to SQLite for audit
 - Swap commands show quote details before executing
 
-An LLM agent using this tool cannot read the raw key material without explicitly opening the wallet files, which requires user approval in standard permission modes. Combined with permissions (below), this provides two layers of control: the agent must both have the permission enabled *and* get approval for each action.
+The CLI provides three layers of protection for agent-driven workflows:
 
-**What this does not protect against:** These controls operate at the CLI and agent-permission level. They do not prevent other software on the same machine from reading the key files. Any tool, MCP server, plugin, or script running under the same OS user account can read `~/.sol/wallets/` directly. If you grant an agent access to additional tools — especially ones that can read arbitrary files or execute shell commands — those tools can extract your private keys regardless of Sol CLI permissions.
+1. **Permissions** — control which operations are allowed (swap, transfer, stake, etc.)
+2. **Transaction limits** — cap per-transaction and daily USD spend
+3. **Allowlists** — restrict which addresses and tokens can be used
 
-Keep wallet balances appropriate to the risk: use dedicated wallets with limited funds for agent-driven workflows, and do not store large holdings in key files accessible to automated tooling.
+### Quick setup for agents
 
-## Permissions
+```bash
+# Set permissions, limits, and allowlists
+sol config set permissions.canSwap true
+sol config set permissions.canTransfer false
+sol config set limits.maxTransactionUsd 500
+sol config set limits.maxDailyUsd 2000
+sol config set allowlist.tokens SOL,USDC,BONK
+
+# Review the full security posture
+sol config status
+
+# Lock — prevents agents from changing settings via CLI
+sol config lock
+```
+
+After locking, security settings can only be changed by a human editing `~/.sol/config.toml` directly. Use `sol config status` at any time to see permissions, limits, daily usage, allowlists, and warnings.
+
+### Transaction limits
+
+| Setting | Description |
+|---|---|
+| `limits.maxTransactionUsd` | Maximum USD value per transaction |
+| `limits.maxDailyUsd` | Maximum total USD in a rolling 24h window |
+
+Limits apply to swaps, sends, staking, deposits, borrows, DCA, and limit orders. They do not apply to withdrawals, MEV claims, or reads. Missing = no limit (backwards compatible).
+
+### Allowlists
+
+- **`allowlist.addresses`** — When set, `token send` is restricted to listed addresses plus your own wallets.
+- **`allowlist.tokens`** — When set, both input and output tokens must be in the list for swaps, DCA, and limit orders. Accepts symbols (`SOL`) or mint addresses.
+
+### Permissions
 
 Restrict which operations are available — useful for giving agents limited access (e.g. monitor-only, swap-but-no-transfer). Disabled commands are not registered at all, so they won't appear in `--help`.
 
-Add a `[permissions]` section to `~/.sol/config.toml`. All flags default to `true` (omitted = permitted):
-
-```toml
-[permissions]
-canTransfer = false
-canSwap = false
-canStake = false
-canWithdrawStake = false
-canLend = false
-canWithdrawLend = false
-canBorrow = false
-canBurn = false
-canCreateWallet = false
-canRemoveWallet = false
-canExportWallet = false
-canPredict = false
-canFetch = false
-```
+All permissions default to `true` (omitted = permitted):
 
 | Permission | Gated subcommands |
 |---|---|
 | `canTransfer` | `token send` |
-| `canSwap` | `token swap`, `token close --all` (runtime) |
+| `canSwap` | `token swap`, `token close --all`, `token dca new/cancel`, `token limit new/cancel` |
 | `canStake` | `stake new` |
 | `canWithdrawStake` | `stake withdraw`, `stake claim-mev` |
 | `canLend` | `lend deposit` |
@@ -367,12 +385,18 @@ canFetch = false
 | `canBorrow` | `lend borrow`, `lend repay` |
 | `canPredict` | `predict buy`, `predict sell`, `predict claim` |
 | `canFetch` | `fetch` (x402 payments) |
-| `canBurn` | `token burn`, `token close --burn` (runtime) |
+| `canBurn` | `token burn`, `token close --burn` |
 | `canCreateWallet` | `wallet create`, `wallet import` |
 | `canRemoveWallet` | `wallet remove` |
 | `canExportWallet` | `wallet export` |
 
-Permissions can only be set by editing `~/.sol/config.toml` directly — `sol config set permissions.*` is rejected.
+### Threat model
+
+An LLM agent using this tool cannot read the raw key material without explicitly opening the wallet files, which requires user approval in standard permission modes. Permissions, limits, and allowlists must all pass before the CLI will execute a transaction.
+
+**What this does not protect against:** These controls operate at the CLI and agent-permission level. They do not prevent other software on the same machine from reading the key files. Any tool, MCP server, plugin, or script running under the same OS user account can read `~/.sol/wallets/` directly. Do not grant agents read or write access to `~/.sol/`.
+
+Keep wallet balances appropriate to the risk: use dedicated wallets with limited funds for agent-driven workflows, and do not store large holdings in key files accessible to automated tooling.
 
 ## Disclaimer
 

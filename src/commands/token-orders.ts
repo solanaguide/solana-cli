@@ -5,6 +5,7 @@ import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.
 import { output, success, failure, isJsonMode, timed, fmtPrice } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import { isPermitted } from '../core/config-manager.js';
+import { assertAllowedToken, assertWithinLimits } from '../core/security.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
 import { explorerUrl } from '../utils/solana.js';
 
@@ -24,6 +25,23 @@ export function registerOrderCommands(token: Command): void {
       try {
         const amount = parseFloat(amountStr);
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
+
+        // Token allowlist check
+        const sdk = getSdk();
+        const resolved = await sdk.registry.resolveTokens([from, to]);
+        const resolvedMints = new Map<string, string>();
+        for (const [sym, tok] of resolved) resolvedMints.set(sym.toUpperCase(), tok.mint);
+        const fromToken = resolved.get(from);
+        const toToken = resolved.get(to);
+        if (fromToken) assertAllowedToken(fromToken.mint, fromToken.symbol, resolvedMints);
+        if (toToken) assertAllowedToken(toToken.mint, toToken.symbol, resolvedMints);
+
+        // Transaction limits check (total DCA amount)
+        if (fromToken && !opts.quoteOnly) {
+          const prices = await sdk.price.getPrices([fromToken.mint]);
+          const price = prices.get(fromToken.mint);
+          if (price) assertWithinLimits(amount * price.priceUsd);
+        }
 
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
 
@@ -52,7 +70,7 @@ export function registerOrderCommands(token: Command): void {
         }
 
         const { result, elapsed_ms } = await timed(() =>
-          getSdk().order.createDca(amount, from, to, walletName, {
+          sdk.order.createDca(amount, from, to, walletName, {
             interval: opts.every,
             count: opts.count,
           })
@@ -180,9 +198,25 @@ export function registerOrderCommands(token: Command): void {
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
         if (isNaN(opts.at) || opts.at <= 0) throw new Error('Invalid target price');
 
+        // Token allowlist check
+        const sdk = getSdk();
+        const resolved = await sdk.registry.resolveTokens([from, to]);
+        const resolvedMints = new Map<string, string>();
+        for (const [sym, tok] of resolved) resolvedMints.set(sym.toUpperCase(), tok.mint);
+        const fromToken = resolved.get(from);
+        const toToken = resolved.get(to);
+        if (fromToken) assertAllowedToken(fromToken.mint, fromToken.symbol, resolvedMints);
+        if (toToken) assertAllowedToken(toToken.mint, toToken.symbol, resolvedMints);
+
+        // Transaction limits check
+        if (fromToken && !opts.quoteOnly) {
+          const prices = await sdk.price.getPrices([fromToken.mint]);
+          const price = prices.get(fromToken.mint);
+          if (price) assertWithinLimits(amount * price.priceUsd);
+        }
+
         if (opts.quoteOnly) {
           // Estimate output for display
-          const sdk = getSdk();
           const inputToken = await sdk.registry.resolveToken(from);
           if (!inputToken) throw new Error(`Unknown token: ${from}`);
           const outputToken = await sdk.registry.resolveToken(to);

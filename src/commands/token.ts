@@ -5,6 +5,7 @@ import { output, success, failure, isJsonMode, timed, verbose, fmtPrice } from '
 import { table } from '../output/table.js';
 import { isValidAddress, solToLamports, uiToTokenAmount, explorerUrl, SOL_MINT } from '../utils/solana.js';
 import { isPermitted } from '../core/config-manager.js';
+import { assertWithinLimits, assertAllowedRecipient, assertAllowedToken } from '../core/security.js';
 import { address, type Instruction } from '@solana/kit';
 import { getTransferSolInstruction } from '@solana-program/system';
 import { getBurnCheckedInstruction, getCloseAccountInstruction } from '@solana-program/token';
@@ -214,6 +215,23 @@ export function registerTokenCommand(program: Command): void {
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
 
         const sdk = getSdk();
+
+        // Token allowlist check
+        const resolved = await sdk.registry.resolveTokens([from, to]);
+        const resolvedMints = new Map<string, string>();
+        for (const [sym, tok] of resolved) resolvedMints.set(sym.toUpperCase(), tok.mint);
+        const fromToken = resolved.get(from);
+        const toToken = resolved.get(to);
+        if (fromToken) assertAllowedToken(fromToken.mint, fromToken.symbol, resolvedMints);
+        if (toToken) assertAllowedToken(toToken.mint, toToken.symbol, resolvedMints);
+
+        // Transaction limits check (USD value of input)
+        if (fromToken && !opts.quoteOnly) {
+          const prices = await sdk.price.getPrices([fromToken.mint]);
+          const price = prices.get(fromToken.mint);
+          if (price) assertWithinLimits(amount * price.priceUsd);
+        }
+
         const { result: quote, elapsed_ms } = await timed(() =>
           sdk.swap.getQuote(from, to, amount, { slippageBps: opts.slippage, router: opts.router })
         );
@@ -267,12 +285,20 @@ export function registerTokenCommand(program: Command): void {
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
         if (!isValidAddress(recipient)) throw new Error('Invalid recipient address');
 
+        // Address allowlist check
+        assertAllowedRecipient(recipient);
+
         const sdk = getSdk();
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const signer = await sdk.ctx.signer.getSigner(walletName);
 
         const tokenMeta = await sdk.registry.resolveToken(tokenSymbol);
         if (!tokenMeta) throw new Error(`Unknown token: ${tokenSymbol}`);
+
+        // Transaction limits check
+        const prices = await sdk.price.getPrices([tokenMeta.mint]);
+        const price = prices.get(tokenMeta.mint);
+        if (price) assertWithinLimits(amount * price.priceUsd);
 
         if (!opts.yes && !isJsonMode()) {
           console.log(`Send ${amount} ${tokenMeta.symbol} from "${walletName}" to ${recipient}`);

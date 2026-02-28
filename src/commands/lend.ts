@@ -3,6 +3,7 @@ import { ensureProviders } from '../sdk-init.js';
 import { PROTOCOL_NAMES } from '@solana-compass/sdk';
 import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import { isPermitted } from '../core/config-manager.js';
+import { assertWithinLimits } from '../core/security.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
@@ -205,6 +206,15 @@ export function registerLendCommand(program: Command): void {
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
 
         const sdk = await ensureProviders();
+
+        // Transaction limits check
+        const tokenMeta = await sdk.registry.resolveToken(token);
+        if (tokenMeta) {
+          const prices = await sdk.price.getPrices([tokenMeta.mint]);
+          const price = prices.get(tokenMeta.mint);
+          if (price) assertWithinLimits(amount * price.priceUsd);
+        }
+
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const { result, elapsed_ms } = await timed(() =>
           sdk.lend.deposit(walletName, token, amount, opts.protocol)
@@ -269,6 +279,15 @@ export function registerLendCommand(program: Command): void {
         if (!opts.collateral) throw new Error('--collateral is required');
 
         const sdk = await ensureProviders();
+
+        // Transaction limits check
+        const tokenMeta = await sdk.registry.resolveToken(token);
+        if (tokenMeta) {
+          const prices = await sdk.price.getPrices([tokenMeta.mint]);
+          const price = prices.get(tokenMeta.mint);
+          if (price) assertWithinLimits(amount * price.priceUsd);
+        }
+
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const { result, elapsed_ms } = await timed(() =>
           sdk.lend.borrow(walletName, token, amount, opts.collateral, opts.protocol)

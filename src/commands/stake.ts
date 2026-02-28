@@ -3,6 +3,8 @@ import { getSdk } from '../sdk-init.js';
 import { SOLANA_COMPASS_VOTE } from '@solana-compass/sdk';
 import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import { isPermitted } from '../core/config-manager.js';
+import { assertWithinLimits } from '../core/security.js';
+import { SOL_MINT } from '../utils/solana.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import { shortenAddress } from '../utils/solana.js';
@@ -65,6 +67,11 @@ export function registerStakeCommand(program: Command): void {
       try {
         const amount = parseFloat(amountStr);
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
+
+        // Transaction limits check
+        const prices = await getSdk().price.getPrices([SOL_MINT]);
+        const solPrice = prices.get(SOL_MINT);
+        if (solPrice) assertWithinLimits(amount * solPrice.priceUsd);
 
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const validatorLabel = opts.validator || `Solana Compass (${shortenAddress(SOLANA_COMPASS_VOTE, 7)})`;

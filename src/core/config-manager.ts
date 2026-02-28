@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { parse, stringify } from 'smol-toml';
 
 export interface Permissions {
+  canSetPermissions?: boolean;
   canTransfer?: boolean;
   canSwap?: boolean;
   canStake?: boolean;
@@ -19,12 +20,24 @@ export interface Permissions {
   canFetch?: boolean;
 }
 
+export interface Limits {
+  maxTransactionUsd?: number;
+  maxDailyUsd?: number;
+}
+
+export interface Allowlist {
+  addresses?: string[];
+  tokens?: string[];
+}
+
 export interface SolConfig {
   rpc?: { url?: string };
   api?: { jupiterApiKey?: string; dflowApiKey?: string };
   onramp?: { provider?: string; transakApiKey?: string; sphereKey?: string };
   defaults?: { wallet?: string; slippageBps?: number; priorityFee?: string; router?: string };
   permissions?: Permissions;
+  limits?: Limits;
+  allowlist?: Allowlist;
   [key: string]: unknown;
 }
 
@@ -73,19 +86,29 @@ export function isPermitted(name: string): boolean {
   return perms?.[name as keyof Permissions] !== false;
 }
 
+const SECURITY_SECTIONS = ['permissions', 'limits', 'allowlist'];
+
+export function isSecurityKey(key: string): boolean {
+  return SECURITY_SECTIONS.some(s => key.startsWith(`${s}.`) || key === s);
+}
+
 export function setConfigValue(key: string, value: string): void {
-  if (key.startsWith('permissions.'))
-    throw new Error('Permission settings cannot be changed via CLI. Edit config.toml directly.');
+  if (isSecurityKey(key)) {
+    if (!isPermitted('canSetPermissions')) {
+      throw new Error('Security settings are locked. Edit ~/.sol/config.toml directly.');
+    }
+  }
 
   const config = readConfig();
   const parts = key.split('.');
 
-  // Parse value — try number, boolean, else string
+  // Parse value — try number, boolean, array, else string
   let parsed: unknown = value;
   if (value === 'true') parsed = true;
   else if (value === 'false') parsed = false;
   else if (/^\d+$/.test(value)) parsed = parseInt(value, 10);
   else if (/^\d+\.\d+$/.test(value)) parsed = parseFloat(value);
+  else if (value.includes(',')) parsed = value.split(',').map(s => s.trim()).filter(Boolean);
 
   let current: Record<string, unknown> = config;
   for (let i = 0; i < parts.length - 1; i++) {

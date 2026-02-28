@@ -346,13 +346,71 @@ canFetch = false
 
 Read-only commands (`token browse/price/info/list`, `wallet list/balance`, `stake list`, `lend rates/positions`, `portfolio`, `network`, `tx`) are always available regardless of permissions.
 
-Permissions cannot be changed via `sol config set` — they must be edited in `config.toml` directly.
+## Security Controls
+
+The CLI provides three layers of protection for agent-driven workflows: **permissions** (what operations are allowed), **transaction limits** (how much can be spent), and **allowlists** (which addresses and tokens are permitted).
+
+### Setting Up Security
+
+Agents can help configure security settings, then the user reviews and locks:
+
+```bash
+# 1. Set permissions
+sol config set permissions.canSwap true
+sol config set permissions.canTransfer false
+
+# 2. Set transaction limits
+sol config set limits.maxTransactionUsd 500
+sol config set limits.maxDailyUsd 2000
+
+# 3. Set allowlists
+sol config set allowlist.tokens SOL,USDC,BONK
+sol config set allowlist.addresses DRtXHDgC312wpNdNCSb8vCoXDcofCJcPHdAynKGz7Vr,7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU
+
+# 4. Review — confirm everything looks right before locking
+sol config status
+
+# 5. Lock — prevents all further changes via CLI
+sol config lock
+```
+
+After locking, security settings can only be changed by a human editing `~/.sol/config.toml` directly.
+
+### Transaction Limits
+
+| Setting | Description |
+|---|---|
+| `limits.maxTransactionUsd` | Maximum USD value per transaction. Missing = no limit. |
+| `limits.maxDailyUsd` | Maximum total USD spent in a rolling 24h window. Missing = no limit. |
+
+Limits apply to: `token swap`, `token send`, `stake new`, `lend deposit`, `lend borrow`, DCA creation, and limit order creation. They do not apply to withdrawals to own wallet, MEV claims, or read operations.
+
+### Address Allowlist
+
+`allowlist.addresses` — comma-separated list of wallet addresses. When set, outbound transfers (`token send`) are restricted to listed addresses plus all wallets in the local wallet database (own wallets are always allowed). Empty or missing = no restriction.
+
+### Token Allowlist
+
+`allowlist.tokens` — comma-separated list of token symbols or mint addresses. When set, both input and output tokens must be in the list for swaps, DCA creation, and limit orders. Empty or missing = all tokens allowed.
+
+### Checking Security Status
+
+```bash
+sol config status              # human-readable security overview
+sol config status --json       # structured output for agents
+```
+
+Shows the full security posture: all permissions and whether they're enabled, transaction limits with current 24h usage, address and token allowlists, whether settings are locked, and warnings about potential risks (e.g. no limits configured, public RPC in use). Agents should use `sol config status --json` to understand what they're allowed to do — not by reading `config.toml` directly.
+
+### Important: Filesystem Access
+
+**Do not grant agents read or write access to `~/.sol/`.** This directory contains your private keys and security configuration. Agents should only interact with Solana through the `sol` CLI commands, never by reading config or key files directly. After helping set up security, recommend the user lock settings with `sol config lock` and restrict filesystem access to `~/.sol/`.
 
 ## Security Model
 
 Private keys are stored as files in `~/.sol/wallets/`. The CLI reads them at transaction-signing time — they are never exposed as environment variables or printed to stdout. An LLM agent using this tool cannot read the raw key material without explicitly opening those files, which requires user approval in standard permission modes.
 
-Permissions (above) limit what operations the CLI can perform, and the user is prompted to confirm each CLI invocation. Together these provide two layers of control: the agent must both have the permission enabled *and* get approval for each action.
+Permissions, limits, and allowlists work together to control what the CLI can do. The agent must have the permission enabled, pass limit and allowlist checks, *and* get user approval for each CLI invocation.
 
 **What this does not protect against:** These controls operate at the CLI and agent-permission level. They do not prevent other software on the same machine from reading the key files. Any tool, MCP server, plugin, or script running under the same OS user account can read `~/.sol/wallets/` directly. If you grant an agent access to additional tools — especially ones that can read arbitrary files or execute shell commands — those tools can extract your private keys regardless of Sol CLI permissions.
 
