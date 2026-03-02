@@ -184,8 +184,8 @@ export class OrcaLpProvider implements LpProvider {
 
       if (positionsData.length === 0) return [];
 
-      // Flatten position bundles
-      const allPositions: typeof positionsData = [];
+      // Flatten position bundles into individual positions
+      const allPositions: any[] = [];
       for (const posData of positionsData) {
         if (posData.isPositionBundle) {
           allPositions.push(...posData.positions);
