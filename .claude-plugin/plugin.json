@@ -1,7 +1,7 @@
 {
   "name": "solana-payments-wallets-trading",
   "description": "Pay people in SOL or USDC, buy and sell tokens, manage wallets, stake, lend, and track your Solana portfolio. No API keys needed.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "author": {
     "name": "solanaguide"
   }
