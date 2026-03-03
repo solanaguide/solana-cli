@@ -3,7 +3,7 @@ import { getSdk } from '../sdk-init.js';
 import { SOLANA_COMPASS_VOTE } from '@solana-compass/sdk';
 import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import { isPermitted } from '../core/config-manager.js';
-import { assertWithinLimits } from '../core/security.js';
+import { assertWithinLimitsFromPrice } from '../core/security.js';
 import { SOL_MINT } from '../utils/solana.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
 import { table } from '../output/table.js';
@@ -71,13 +71,15 @@ export function registerStakeCommand(program: Command): void {
         // Transaction limits check
         const prices = await getSdk().price.getPrices([SOL_MINT]);
         const solPrice = prices.get(SOL_MINT);
-        if (solPrice) assertWithinLimits(amount * solPrice.priceUsd);
+        assertWithinLimitsFromPrice(solPrice?.priceUsd, amount, 'staking');
 
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const validatorLabel = opts.validator || `Solana Compass (${shortenAddress(SOLANA_COMPASS_VOTE, 7)})`;
 
         const { result, elapsed_ms } = await timed(() =>
-          getSdk().stake.createAndDelegateStake(walletName, amount, opts.validator)
+          getSdk().stake.createAndDelegateStake(walletName, amount, opts.validator, {
+            fromPriceUsd: solPrice?.priceUsd,
+          })
         );
 
         if (isJsonMode()) {

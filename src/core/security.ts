@@ -1,6 +1,9 @@
 import { readConfig, type Permissions, getConfigPath } from './config-manager.js';
 import { getDb } from '../db/database.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
+import { getWellKnownByMint } from '../utils/token-list.js';
+import { getTokenByMint } from '../db/repos/token-repo.js';
+import { tokenAmountToUi } from '../utils/solana.js';
 
 // ── Transaction limit guard ─────────────────────────────────────
 
@@ -107,26 +110,54 @@ export function assertWithinLimits(usdValue: number): void {
   assertWithinDailyLimit(usdValue);
 }
 
+export function assertWithinLimitsFromPrice(
+  priceUsd: number | undefined,
+  amountUi: number,
+  operation: string,
+): void {
+  const config = readConfig();
+  const limits = config.limits;
+  const hasLimits = limits?.maxTransactionUsd != null || limits?.maxDailyUsd != null;
+  if (!hasLimits) return;
+
+  if (!priceUsd || !Number.isFinite(priceUsd) || priceUsd <= 0) {
+    const err = new Error(
+      `Transaction blocked: cannot determine USD value for ${operation} because a reliable token price is unavailable.\n` +
+      `Price is required while limits.maxTransactionUsd or limits.maxDailyUsd are enabled.`
+    );
+    (err as any).code = 'PRICE_REQUIRED_FOR_LIMITS';
+    throw err;
+  }
+
+  assertWithinLimits(amountUi * priceUsd);
+}
+
 // ── Daily usage from transaction log ────────────────────────────
 
 export function getDailyUsage(): number {
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-  const row = getDb().prepare(`
-    SELECT COALESCE(SUM(
-      CASE
-        WHEN from_price_usd IS NOT NULL AND from_amount IS NOT NULL
-        THEN CAST(from_amount AS REAL) * from_price_usd
-        ELSE 0
-      END
-    ), 0) as total_usd
+  const rows = getDb().prepare(`
+    SELECT from_mint, from_amount, from_price_usd
     FROM transaction_log
     WHERE status = 'confirmed'
       AND created_at >= ?
       AND type NOT IN ('withdraw', 'claim_mev', 'close')
-  `).get(cutoff) as { total_usd: number };
+      AND from_amount IS NOT NULL
+      AND from_price_usd IS NOT NULL
+  `).all(cutoff) as Array<{
+    from_mint: string | null;
+    from_amount: string;
+    from_price_usd: number;
+  }>;
 
-  return row.total_usd;
+  let totalUsd = 0;
+  for (const row of rows) {
+    const uiAmount = normalizeToUiAmount(row.from_mint, row.from_amount);
+    if (!Number.isFinite(uiAmount) || uiAmount <= 0) continue;
+    totalUsd += uiAmount * row.from_price_usd;
+  }
+  return totalUsd;
 }
 
 // ── Security status for config status command ───────────────────
@@ -224,4 +255,17 @@ export function getSecurityStatus(): SecurityStatus {
 
 function fmtUsd(n: number): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function normalizeToUiAmount(mint: string | null, rawAmount: string): number {
+  if (!mint) return Number(rawAmount);
+
+  const wellKnown = getWellKnownByMint(mint);
+  if (wellKnown) return tokenAmountToUi(rawAmount, wellKnown.decimals);
+
+  const cached = getTokenByMint(mint);
+  if (cached) return tokenAmountToUi(rawAmount, cached.decimals);
+
+  // Fallback for unknown mints/log records: treat stored amount as UI.
+  return Number(rawAmount);
 }

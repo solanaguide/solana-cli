@@ -3,7 +3,7 @@ import { ensureProviders } from '../sdk-init.js';
 import { PROTOCOL_NAMES } from '@solana-compass/sdk';
 import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import { isPermitted } from '../core/config-manager.js';
-import { assertWithinLimits } from '../core/security.js';
+import { assertWithinLimitsFromPrice } from '../core/security.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
@@ -212,7 +212,7 @@ export function registerLendCommand(program: Command): void {
         if (tokenMeta) {
           const prices = await sdk.price.getPrices([tokenMeta.mint]);
           const price = prices.get(tokenMeta.mint);
-          if (price) assertWithinLimits(amount * price.priceUsd);
+          assertWithinLimitsFromPrice(price?.priceUsd, amount, `lend deposit token ${tokenMeta.symbol}`);
         }
 
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
@@ -285,7 +285,7 @@ export function registerLendCommand(program: Command): void {
         if (tokenMeta) {
           const prices = await sdk.price.getPrices([tokenMeta.mint]);
           const price = prices.get(tokenMeta.mint);
-          if (price) assertWithinLimits(amount * price.priceUsd);
+          assertWithinLimitsFromPrice(price?.priceUsd, amount, `borrow token ${tokenMeta.symbol}`);
         }
 
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();

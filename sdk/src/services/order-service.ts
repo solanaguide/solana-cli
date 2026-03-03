@@ -229,7 +229,16 @@ export function createOrderService(
     const data = await res.json() as any;
     const signature = await signAndExecute(data.transaction, data.requestId, `${getRecurringUrl()}/execute`, walletName);
 
-    txLogger.log({ signature, type: 'dca_create', walletName, fromMint: inputToken.mint, toMint: outputToken.mint, fromAmount: String(rawTotalAmount), status: 'confirmed' });
+    txLogger.log({
+      signature,
+      type: 'dca_create',
+      walletName,
+      fromMint: inputToken.mint,
+      toMint: outputToken.mint,
+      fromAmount: String(rawTotalAmount),
+      fromPriceUsd: inputPriceUsd,
+      status: 'confirmed',
+    });
 
     return { signature, orderKey: data.order, inputSymbol: inputToken.symbol, outputSymbol: outputToken.symbol, totalAmount, amountPerOrder, count: opts.count, interval: opts.interval };
   }
@@ -340,7 +349,17 @@ export function createOrderService(
     const data = await res.json() as any;
     const signature = await signAndExecute(data.transaction, data.requestId, `${getTriggerUrl()}/execute`, walletName);
 
-    txLogger.log({ signature, type: 'limit_create', walletName, fromMint: inputToken.mint, toMint: outputToken.mint, fromAmount: String(rawInputAmount), toAmount: String(rawOutputAmount), status: 'confirmed' });
+    txLogger.log({
+      signature,
+      type: 'limit_create',
+      walletName,
+      fromMint: inputToken.mint,
+      toMint: outputToken.mint,
+      fromAmount: String(rawInputAmount),
+      toAmount: String(rawOutputAmount),
+      fromPriceUsd: inputPriceUsd,
+      status: 'confirmed',
+    });
 
     return { signature, orderKey: data.order, inputSymbol: inputToken.symbol, outputSymbol: outputToken.symbol, inputAmount, targetPrice: opts.targetPrice, outputAmount: outputUiAmount };
   }

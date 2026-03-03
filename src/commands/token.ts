@@ -5,10 +5,17 @@ import { output, success, failure, isJsonMode, timed, verbose, fmtPrice } from '
 import { table } from '../output/table.js';
 import { isValidAddress, solToLamports, uiToTokenAmount, explorerUrl, SOL_MINT } from '../utils/solana.js';
 import { isPermitted } from '../core/config-manager.js';
-import { assertWithinLimits, assertAllowedRecipient, assertAllowedToken } from '../core/security.js';
+import { assertWithinLimitsFromPrice, assertAllowedRecipient, assertAllowedToken } from '../core/security.js';
 import { address, type Instruction } from '@solana/kit';
 import { getTransferSolInstruction } from '@solana-program/system';
-import { getBurnCheckedInstruction, getCloseAccountInstruction } from '@solana-program/token';
+import {
+  findAssociatedTokenPda,
+  getCreateAssociatedTokenIdempotentInstructionAsync,
+  getTransferCheckedInstruction,
+  getBurnCheckedInstruction,
+  getCloseAccountInstruction,
+  TOKEN_PROGRAM_ADDRESS,
+} from '@solana-program/token';
 import * as walletRepo from '../db/repos/wallet-repo.js';
 import { registerOrderCommands } from './token-orders.js';
 import type { TokenAccountInfo } from '@solana-compass/sdk';
@@ -229,7 +236,7 @@ export function registerTokenCommand(program: Command): void {
         if (fromToken && !opts.quoteOnly) {
           const prices = await sdk.price.getPrices([fromToken.mint]);
           const price = prices.get(fromToken.mint);
-          if (price) assertWithinLimits(amount * price.priceUsd);
+          assertWithinLimitsFromPrice(price?.priceUsd, amount, `swap input token ${fromToken.symbol}`);
         }
 
         const { result: quote, elapsed_ms } = await timed(() =>
@@ -298,7 +305,7 @@ export function registerTokenCommand(program: Command): void {
         // Transaction limits check
         const prices = await sdk.price.getPrices([tokenMeta.mint]);
         const price = prices.get(tokenMeta.mint);
-        if (price) assertWithinLimits(amount * price.priceUsd);
+        assertWithinLimitsFromPrice(price?.priceUsd, amount, `transfer token ${tokenMeta.symbol}`);
 
         if (!opts.yes && !isJsonMode()) {
           console.log(`Send ${amount} ${tokenMeta.symbol} from "${walletName}" to ${recipient}`);
@@ -316,6 +323,7 @@ export function registerTokenCommand(program: Command): void {
             walletName,
             fromMint: SOL_MINT,
             fromAmount: String(solToLamports(amount)),
+            fromPriceUsd: price?.priceUsd,
           });
 
           if (isJsonMode()) {
@@ -334,9 +342,59 @@ export function registerTokenCommand(program: Command): void {
             console.log(`  Explorer: ${result.explorerUrl}`);
           }
         } else {
-          // SPL token transfer — requires token program instructions
-          // TODO: Implement SPL token transfer using @solana-program/token
-          throw new Error('SPL token transfers coming soon. Use SOL transfers for now.');
+          const mint = address(tokenMeta.mint);
+          const [sourceAta] = await findAssociatedTokenPda({
+            owner: signer.address,
+            mint,
+            tokenProgram: TOKEN_PROGRAM_ADDRESS,
+          });
+          const [destinationAta] = await findAssociatedTokenPda({
+            owner: address(recipient),
+            mint,
+            tokenProgram: TOKEN_PROGRAM_ADDRESS,
+          });
+          const rawAmount = uiToTokenAmount(amount, tokenMeta.decimals);
+
+          const createRecipientAtaIx = await getCreateAssociatedTokenIdempotentInstructionAsync({
+            payer: signer,
+            ata: destinationAta,
+            owner: address(recipient),
+            mint,
+            tokenProgram: TOKEN_PROGRAM_ADDRESS,
+          });
+
+          const ix = getTransferCheckedInstruction({
+            source: sourceAta,
+            mint,
+            destination: destinationAta,
+            authority: signer,
+            amount: rawAmount,
+            decimals: tokenMeta.decimals,
+          });
+
+          const result = await sdk.tx.buildAndSendTransaction([createRecipientAtaIx as unknown as Instruction, ix], signer, {
+            txType: 'transfer',
+            walletName,
+            fromMint: tokenMeta.mint,
+            fromAmount: String(rawAmount),
+            fromPriceUsd: price?.priceUsd,
+          });
+
+          if (isJsonMode()) {
+            output(success({
+              signature: result.signature,
+              from: signer.address,
+              to: recipient,
+              amount,
+              token: tokenMeta.symbol,
+              status: result.status,
+              explorerUrl: result.explorerUrl,
+            }));
+          } else {
+            console.log(`\nSent ${amount} ${tokenMeta.symbol}`);
+            console.log(`  Signature: ${result.signature}`);
+            console.log(`  Explorer: ${result.explorerUrl}`);
+          }
         }
       } catch (err: any) {
         output(failure('SEND_FAILED', err.message));
@@ -459,7 +517,7 @@ export function registerTokenCommand(program: Command): void {
     .action(async (symbol: string | undefined, opts) => {
       try {
         if (opts.all && !isPermitted('canSwap')) throw new Error('Permission denied: canSwap is disabled');
-        if (opts.burn && !isPermitted('canBurn')) throw new Error('Permission denied: canBurn is disabled');
+        if ((opts.burn || opts.all) && !isPermitted('canBurn')) throw new Error('Permission denied: canBurn is disabled');
 
         const { result: data, elapsed_ms } = await timed(async () => {
           const sdk = getSdk();

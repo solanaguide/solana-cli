@@ -5,7 +5,7 @@ import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.
 import { output, success, failure, isJsonMode, timed, fmtPrice } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import { isPermitted } from '../core/config-manager.js';
-import { assertAllowedToken, assertWithinLimits } from '../core/security.js';
+import { assertAllowedToken, assertWithinLimitsFromPrice } from '../core/security.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
 import { explorerUrl } from '../utils/solana.js';
 
@@ -40,7 +40,7 @@ export function registerOrderCommands(token: Command): void {
         if (fromToken && !opts.quoteOnly) {
           const prices = await sdk.price.getPrices([fromToken.mint]);
           const price = prices.get(fromToken.mint);
-          if (price) assertWithinLimits(amount * price.priceUsd);
+          assertWithinLimitsFromPrice(price?.priceUsd, amount, `DCA input token ${fromToken.symbol}`);
         }
 
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
@@ -212,7 +212,7 @@ export function registerOrderCommands(token: Command): void {
         if (fromToken && !opts.quoteOnly) {
           const prices = await sdk.price.getPrices([fromToken.mint]);
           const price = prices.get(fromToken.mint);
-          if (price) assertWithinLimits(amount * price.priceUsd);
+          assertWithinLimitsFromPrice(price?.priceUsd, amount, `limit order input token ${fromToken.symbol}`);
         }
 
         if (opts.quoteOnly) {

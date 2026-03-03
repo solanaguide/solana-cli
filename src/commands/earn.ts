@@ -3,6 +3,7 @@ import { ensureProviders } from '../sdk-init.js';
 import { EARN_PROTOCOL_NAMES } from '@solana-compass/sdk';
 import { getDefaultWalletName, resolveWalletName } from '../core/wallet-manager.js';
 import { isPermitted } from '../core/config-manager.js';
+import { assertWithinLimitsFromPrice } from '../core/security.js';
 import { output, success, failure, isJsonMode, timed } from '../output/formatter.js';
 import { table } from '../output/table.js';
 import * as walletRepo from '../db/repos/wallet-repo.js';
@@ -151,6 +152,15 @@ export function registerEarnCommand(program: Command): void {
         if (isNaN(amount) || amount <= 0) throw new Error('Invalid amount');
 
         const sdk = await ensureProviders();
+
+        // Transaction limits check
+        const tokenMeta = await sdk.registry.resolveToken(token);
+        if (tokenMeta) {
+          const prices = await sdk.price.getPrices([tokenMeta.mint]);
+          const price = prices.get(tokenMeta.mint);
+          assertWithinLimitsFromPrice(price?.priceUsd, amount, `earn deposit token ${tokenMeta.symbol}`);
+        }
+
         const walletName = opts.wallet ? resolveWalletName(opts.wallet) : getDefaultWalletName();
         const { result, elapsed_ms } = await timed(() =>
           sdk.earn.deposit(walletName, token, amount, opts.protocol, opts.vault)

@@ -62,7 +62,12 @@ export interface ClaimMevResult {
 
 export interface StakeService {
   getStakeAccounts(walletAddress: string): Promise<StakeAccountInfo[]>;
-  createAndDelegateStake(walletName: string, amountSol: number, validatorVote?: string): Promise<CreateStakeResult>;
+  createAndDelegateStake(
+    walletName: string,
+    amountSol: number,
+    validatorVote?: string,
+    opts?: { fromPriceUsd?: number },
+  ): Promise<CreateStakeResult>;
   withdrawStake(walletName: string, stakeAccountAddress: string, amountSol?: number, force?: boolean): Promise<WithdrawStakeResult>;
   claimMev(walletName: string, walletAddress: string, stakeAccountAddress?: string, withdrawOnly?: boolean): Promise<ClaimMevResult[]>;
 }
@@ -120,6 +125,7 @@ export function createStakeService(ctx: SolContext, tx: TransactionService): Sta
     walletName: string,
     amountSol: number,
     validatorVote?: string,
+    opts?: { fromPriceUsd?: number },
   ): Promise<CreateStakeResult> {
     const payer = await signer.getSigner(walletName);
     const validator = validatorVote || SOLANA_COMPASS_VOTE;
@@ -158,6 +164,9 @@ export function createStakeService(ctx: SolContext, tx: TransactionService): Sta
     const result = await tx.buildAndSendTransaction(instructions, payer, {
       txType: 'stake',
       walletName,
+      fromMint: 'So11111111111111111111111111111111111111112',
+      fromAmount: String(stakeLamports),
+      fromPriceUsd: opts?.fromPriceUsd,
     });
 
     return {

@@ -214,6 +214,7 @@ export async function createDcaOrder(
     fromMint: inputToken.mint,
     toMint: outputToken.mint,
     fromAmount: String(rawTotalAmount),
+    fromPriceUsd: inputPriceUsd,
     status: 'confirmed',
   });
 
@@ -422,6 +423,7 @@ export async function createLimitOrder(
     toMint: outputToken.mint,
     fromAmount: String(rawInputAmount),
     toAmount: String(rawOutputAmount),
+    fromPriceUsd: inputPriceUsd,
     status: 'confirmed',
   });
 
