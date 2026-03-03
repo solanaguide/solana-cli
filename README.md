@@ -27,6 +27,8 @@ sol portfolio
 sol portfolio snapshot --label "post-rebalance"
 ```
 
+**Documentation:** [solanacompass.com/skills](https://solanacompass.com/skills) — complete guides on trading, staking, lending, prediction markets, agent security, and more.
+
 ---
 
 ## Install
