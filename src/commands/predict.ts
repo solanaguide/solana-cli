@@ -37,8 +37,8 @@ export function registerPredictCommand(program: Command): void {
         } else {
           console.log(table(
             events.map(e => ({
-              id: shortenAddress(e.id, 6),
-              title: truncate(e.title, 50),
+              id: e.id,
+              title: e.title,
               category: e.category,
               markets: String(e.markets.length),
               volume: fmtUsd(e.volume),
@@ -81,8 +81,8 @@ export function registerPredictCommand(program: Command): void {
         } else {
           console.log(table(
             events.map(e => ({
-              id: shortenAddress(e.id, 6),
-              title: truncate(e.title, 50),
+              id: e.id,
+              title: e.title,
               category: e.category,
               markets: String(e.markets.length),
               volume: fmtUsd(e.volume),
@@ -127,8 +127,8 @@ export function registerPredictCommand(program: Command): void {
           } else {
             console.log(table(
               event.markets.map(m => ({
-                id: shortenAddress(m.id, 6),
-                title: truncate(m.title, 40),
+                id: m.id,
+                title: m.title,
                 yes: `$${m.yesPrice.toFixed(2)}`,
                 no: `$${m.noPrice.toFixed(2)}`,
                 volume: fmtUsd(m.volume),

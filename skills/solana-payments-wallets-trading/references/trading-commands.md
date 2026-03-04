@@ -38,26 +38,19 @@ sol token browse verified --limit 50         # top 50 verified tokens
 | `--interval <interval>` | 1h | Time window: `5m`, `1h`, `6h`, `24h` (trending, top-traded, top-organic only) |
 | `--limit <n>` | 20 | Number of results to show |
 
-### JSON Output
+### Example Output
 
-```json
-{
-  "ok": true,
-  "data": [
-    {
-      "mint": "9BB6...pump",
-      "symbol": "Fartcoin",
-      "name": "Fartcoin",
-      "decimals": 6,
-      "priceUsd": 0.14,
-      "volume24hUsd": 23400000,
-      "change24hPct": 6.7,
-      "metadata": { "organicScore": 95.7, "holderCount": 165304 }
-    }
-  ],
-  "meta": { "elapsed_ms": 450 }
-}
 ```
+#   Symbol  Name       Mint                                          Price      24h     Volume 24h  Organic  Holders
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ 1  FART    Fartcoin   9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump  $0.14    +6.7%      $23.4M      96%  165,304
+ 2  BONK    Bonk       DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263  $0.00002 +3.2%      $18.1M      89%  820,451
+ 3  WIF     dogwifhat  EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm  $1.23    -1.5%      $12.7M      92%  432,100
+```
+
+Full mint addresses, organic scores, and holder counts are shown when
+available — useful for distinguishing tokens that share a symbol
+(e.g. multiple $TRUMP tokens).
 
 Browse results are recycled into the local token cache, so `sol token info` and `sol token price` resolve instantly for any token you've browsed.
 
@@ -78,7 +71,6 @@ sol token swap 100 usdc sol --wallet bot   # from a specific wallet
 sol token swap 50 usdc bonk --quote-only   # preview without executing
 sol token swap 50 usdc bonk --slippage 100 # 1% slippage (100 bps)
 sol token swap 50 usdc bonk --router jupiter  # force a specific router
-sol token swap 50 usdc bonk --yes          # skip confirmation
 ```
 
 ### Flags
@@ -89,7 +81,27 @@ sol token swap 50 usdc bonk --yes          # skip confirmation
 | `--router <name>` | best | Router: `best`, `jupiter`, `dflow` |
 | `--quote-only` | false | Show quote without executing |
 | `--wallet <name>` | default | Wallet to swap from |
-| `--yes` | false | Skip confirmation prompt |
+
+### Example Output
+
+Quote preview (`--quote-only`):
+
+```
+Swap Quote:
+  50 USDC → 2500000.000000 BONK
+  Price impact: 0.0100%
+  Route: USDC → BONK (via jupiter)
+  Slippage: 0.5%
+```
+
+Executed swap:
+
+```
+Swap executed!
+  50 USDC → 2500000.000000 BONK
+  Signature: 4xK9...abc
+  Explorer: https://solscan.io/tx/4xK9...abc
+```
 
 ### Token Resolution
 
@@ -104,25 +116,6 @@ address. Resolution order:
 For safety with unfamiliar tokens, verify with `sol token info <symbol>`
 first, or use the mint address directly.
 
-### JSON Output
-
-```json
-{
-  "ok": true,
-  "data": {
-    "signature": "4xK9...abc",
-    "from_token": "USDC",
-    "from_amount": 50,
-    "to_token": "BONK",
-    "to_amount": 2500000,
-    "price_impact": "0.01%",
-    "from_price_usd": 1.0,
-    "to_price_usd": 0.00002
-  },
-  "meta": { "elapsed_ms": 2100 }
-}
-```
-
 ## Send Tokens
 
 ```bash
@@ -136,7 +129,7 @@ Send SOL or any SPL token to a wallet address.
 ```bash
 sol token send 2 sol 7nY...xyz
 sol token send 50 usdc GkX...abc
-sol token send 1000 bonk AgE...def --yes
+sol token send 1000 bonk AgE...def
 sol token send 0.5 sol 7nY...xyz --wallet trading
 ```
 
@@ -145,24 +138,13 @@ sol token send 0.5 sol 7nY...xyz --wallet trading
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--wallet <name>` | default | Wallet to send from |
-| `--yes` | false | Skip confirmation prompt |
 
-In `--json` mode, confirmations are always skipped.
+### Example Output
 
-### JSON Output
-
-```json
-{
-  "ok": true,
-  "data": {
-    "signature": "5aB...xyz",
-    "token": "USDC",
-    "amount": 50,
-    "recipient": "GkX...abc",
-    "price_usd": 1.0
-  },
-  "meta": { "elapsed_ms": 1500 }
-}
+```
+Sent 50 USDC to GkX...abc
+  Signature: 5aB...xyz
+  Explorer: https://solscan.io/tx/5aB...xyz
 ```
 
 ## Check Prices
@@ -178,21 +160,16 @@ sol token price sol                       # single token
 sol token price sol usdc bonk eth         # multiple at once
 ```
 
-Prices come from Jupiter Price API with CoinGecko fallback.
+### Example Output
 
-### JSON Output
-
-```json
-{
-  "ok": true,
-  "data": {
-    "prices": [
-      { "symbol": "SOL", "price_usd": 150.25, "mint": "So11...1112" }
-    ]
-  },
-  "meta": { "elapsed_ms": 200 }
-}
 ```
+SOL: $150.25
+USDC: $1.00
+BONK: $0.000020
+ETH: $3,245.80
+```
+
+Prices come from Jupiter Price API with CoinGecko fallback.
 
 ## Token Info
 
@@ -203,6 +180,14 @@ sol token info <symbol>
 Shows token metadata — mint address, decimals, total supply. Useful
 for verifying which token a symbol resolves to before transacting.
 
+### Example Output
+
+```
+BONK — Bonk
+  Mint:     DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263
+  Decimals: 5
+```
+
 ## List Tokens
 
 ```bash
@@ -210,7 +195,18 @@ sol token list                            # default wallet
 sol token list --wallet trading           # specific wallet
 ```
 
-Lists all tokens held in the wallet with balances and USD values.
+Lists all tokens held in the wallet with balances. The full mint
+address is shown so you can distinguish tokens that share a symbol.
+
+### Example Output
+
+```
+Token   Balance       Mint
+───────────────────────────────────────────────────────────────────────────
+SOL     12.500000     So11111111111111111111111111111111111111112
+USDC    250.000000    EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+BONK    5000000.000000  DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263
+```
 
 ## Burn Tokens
 
@@ -233,7 +229,6 @@ sol token burn bonk --all --close         # burn and close the account
 | `--all` | Burn entire balance |
 | `--close` | Close the token account after burning (reclaims ~0.002 SOL rent) |
 | `--wallet <name>` | Wallet to burn from |
-| `--yes` | Skip confirmation |
 
 ## Close Token Accounts
 
@@ -247,8 +242,8 @@ Closes empty token accounts and reclaims rent (~0.002 SOL each).
 
 ```bash
 sol token close usdc                      # close specific account
-sol token close --all --yes               # close all empty accounts
-sol token close --all --burn --yes        # burn dust + close all
+sol token close --all                     # close all empty accounts
+sol token close --all --burn              # burn dust + close all
 ```
 
 ### Flags
@@ -258,7 +253,6 @@ sol token close --all --burn --yes        # burn dust + close all
 | `--all` | Close all eligible accounts |
 | `--burn` | Burn remaining dust before closing |
 | `--wallet <name>` | Wallet to close accounts in |
-| `--yes` | Skip confirmation |
 
 ## DCA (Dollar-Cost Average)
 

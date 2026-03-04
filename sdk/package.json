@@ -1,6 +1,6 @@
 {
   "name": "@solana-compass/sdk",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Solana SDK for building apps with Jupiter, Kamino, MarginFi, Drift, Loopscale, and more",
   "type": "module",
   "main": "dist/index.js",

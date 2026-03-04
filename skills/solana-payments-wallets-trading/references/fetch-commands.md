@@ -88,10 +88,11 @@ sol fetch https://api.example.com/data --wallet trading
 Not supported: `-u` (auth), `-F` (multipart), `-L` (redirects),
 `-k` (insecure), `-b`/`-c` (cookies). For those, use curl directly.
 
-### Dry-run output
+### Example Output
 
-```bash
-$ sol fetch https://api.example.com/data --dry-run
+Dry-run:
+
+```
 Payment Required (x402)
   Amount:    $0.001000 USDC
   Recipient: Gzeh...QWa
@@ -100,39 +101,14 @@ Payment Required (x402)
 Run without --dry-run to pay and fetch the resource.
 ```
 
-### Paid output
+Paid:
 
-```bash
-$ sol fetch https://api.example.com/data
+```
 Paid $0.001000 USDC to Gzeh...QWa        # ← stderr
 {"solana":{"usd":81.65}}                  # ← stdout
 ```
 
-### JSON output
-
-```json
-{
-  "ok": true,
-  "data": {
-    "url": "https://api.example.com/data",
-    "status": 200,
-    "body": "{\"solana\":{\"usd\":81.65}}",
-    "contentType": "application/json; charset=utf-8",
-    "paid": true,
-    "payment": {
-      "amountUsdc": 0.001,
-      "recipient": "Gzeh...QWa",
-      "network": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
-      "signature": "5xK9..."
-    }
-  },
-  "meta": { "elapsed_ms": 3500 }
-}
-```
-
-When `paid` is `false`, the `payment` field is absent (non-402
-response) or contains only `amountUsdc`, `recipient`, and `network`
-(dry-run).
+Use `--json` for the structured envelope (see json-output-format.md).
 
 ### Error codes
 

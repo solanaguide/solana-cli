@@ -24,19 +24,12 @@ sol stake new 10 --wallet cold            # from a specific wallet
 | `--validator <vote-address>` | Solana Compass | Validator to delegate to |
 | `--wallet <name>` | default | Wallet to fund the stake from |
 
-### JSON Output
+### Example Output
 
-```json
-{
-  "ok": true,
-  "data": {
-    "signature": "3xY...abc",
-    "stake_account": "7gK...def",
-    "amount_sol": 10,
-    "validator": "Comp...ass"
-  },
-  "meta": { "elapsed_ms": 2500 }
-}
+```
+Staked 10 SOL with Solana Compass (Comp4F...xYz)
+  Stake account: 7gK...def
+  Tx: https://solscan.io/tx/3xY...abc
 ```
 
 ## List Stake Accounts
@@ -52,26 +45,14 @@ any claimable MEV tips.
 
 Hints at `sol stake claim-mev` when tips are available.
 
-### JSON Output
+### Example Output
 
-```json
-{
-  "ok": true,
-  "data": {
-    "stakes": [
-      {
-        "address": "7gK...def",
-        "amount_sol": 10,
-        "validator": "Comp...ass",
-        "status": "active",
-        "claimable_mev_sol": 0.05
-      }
-    ],
-    "total_staked_sol": 10,
-    "total_claimable_mev_sol": 0.05
-  },
-  "meta": { "elapsed_ms": 1200 }
-}
+```
+Stake Account   Balance        Status  Validator
+─────────────────────────────────────────────────────────
+7gK3a2...def    10.0500 SOL *  active  Comp4F...xYz
+
+* 0.050000 SOL claimable MEV across 1 account. Run `sol stake claim-mev` to compound.
 ```
 
 ## Claim MEV Tips
@@ -123,21 +104,6 @@ sol stake withdraw 7gK...abc --force      # force deactivate active stake
 |------|---------|-------------|
 | `--wallet <name>` | default | Authority wallet |
 | `--force` | false | Force deactivation of active stake |
-
-### JSON Output
-
-```json
-{
-  "ok": true,
-  "data": {
-    "signature": "2bC...xyz",
-    "stake_account": "7gK...abc",
-    "withdrawn_sol": 10,
-    "action": "withdrawn"
-  },
-  "meta": { "elapsed_ms": 1800 }
-}
-```
 
 ## Validator Selection
 

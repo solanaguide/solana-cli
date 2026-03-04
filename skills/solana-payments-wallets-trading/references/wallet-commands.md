@@ -13,6 +13,13 @@ Creates a new Ed25519 keypair and stores it as a JSON key file in
 
 The first wallet created becomes the default for all commands.
 
+### Example Output
+
+```
+Created wallet "trading"
+  Address: 7nY...xyz
+```
+
 ## List Wallets
 
 ```bash
@@ -23,6 +30,17 @@ sol wallet list --label trading           # filter by label
 Shows wallet name, address, SOL balance, and whether it's the default.
 Hints at `sol wallet balance <name>` for full token breakdown.
 
+### Example Output
+
+```
+Name        Address                                          SOL     Labels
+──────────────────────────────────────────────────────────────────────────────
+* main      7nYz...xyzABCDEFGH1234567890abcdef1234567890   12.5000 SOL  trading
+  cold      C9dz...hVVABCDEFGH1234567890abcdef1234567890    5.0000 SOL  —
+
+Run `sol wallet balance` for full token balances and USD values.
+```
+
 ## Check Balances
 
 ```bash
@@ -30,8 +48,21 @@ sol wallet balance                        # default wallet, all tokens + USD
 sol wallet balance trading                # specific wallet
 ```
 
-Displays every token held with current USD values. Tokens below the
-dust threshold ($0.0001) are grouped as dust.
+Displays every token held with current USD values.
+
+### Example Output
+
+```
+Wallet: main (7nY...xyz)
+
+Token   Balance        Price       Value
+──────────────────────────────────────────────
+SOL     12.500000      $150.25     $1,878.13
+USDC    250.000000     $1.00       $250.00
+BONK    5000000.000000 $0.000020   $100.00
+
+Total: $2,228.13
+```
 
 ## Import an Existing Wallet
 
@@ -114,35 +145,6 @@ sol token swap 50 usdc bonk --wallet trading
 sol stake new 10 --wallet cold
 sol lend deposit 100 usdc --wallet defi
 sol portfolio --wallet trading
-```
-
-## JSON Output
-
-All wallet commands support `--json`:
-
-```bash
-sol wallet list --json
-sol wallet balance --json
-```
-
-### Example: `sol wallet list --json`
-
-```json
-{
-  "ok": true,
-  "data": {
-    "wallets": [
-      {
-        "name": "main",
-        "address": "7nY...xyz",
-        "sol_balance": 12.5,
-        "is_default": true,
-        "labels": ["trading"]
-      }
-    ]
-  },
-  "meta": { "elapsed_ms": 320 }
-}
 ```
 
 ## Data Storage

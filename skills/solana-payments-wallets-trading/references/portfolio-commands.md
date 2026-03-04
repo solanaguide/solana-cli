@@ -19,53 +19,37 @@ A snapshot is taken automatically on each portfolio view
 (rate-limited to once every 5 minutes), so `sol portfolio compare`
 always has recent data to work with.
 
-### JSON Output
+### Example Output
 
-```json
-{
-  "ok": true,
-  "data": {
-    "wallets": [
-      { "name": "main", "address": "C9dzXf...hVVH" }
-    ],
-    "positions": [
-      {
-        "type": "token",
-        "symbol": "SOL",
-        "amount": 12.5,
-        "valueUsd": 1878.13
-      },
-      {
-        "type": "stake",
-        "symbol": "SOL",
-        "amount": 10,
-        "valueUsd": 1502.50,
-        "extra": { "validator": "Comp...ass", "status": "active" }
-      },
-      {
-        "type": "lend",
-        "symbol": "USDC",
-        "amount": 100,
-        "valueUsd": 100,
-        "extra": { "side": "deposit", "apy": 0.085 }
-      },
-      {
-        "type": "order",
-        "symbol": "USDC",
-        "amount": 50.5,
-        "valueUsd": 50.5,
-        "extra": {
-          "orderType": "dca",
-          "outputSymbol": "SOL",
-          "fillPct": 50,
-          "status": "active"
-        }
-      }
-    ],
-    "totalValueUsd": 3480.63
-  },
-  "meta": { "elapsed_ms": 2500 }
-}
+```
+Tokens — main (7nY...xyz)
+
+Token   Amount        Value
+───────────────────────────────────
+SOL     12.500000     $1,878.13
+USDC    250.000000    $250.00
+BONK    5000000       $100.00
+
+Staking
+
+Account      Staked          Status  Validator      MEV
+────────────────────────────────────────────────────────────
+7gK3..def    10.0500 SOL *   active  Comp4F..xYz    0.050000 SOL *
+
+Lending
+
+Protocol  Token  Side      Amount   Value     APY
+─────────────────────────────────────────────────────
+kamino    USDC   deposit   100.00   $100.00   4.50%
+
+Allocation
+
+SOL     ████████████████░░░░  56.3%
+USDC    ██████░░░░░░░░░░░░░░  10.5%
+BONK    ██░░░░░░░░░░░░░░░░░░   3.0%
+Staked  ████████████████░░░░  45.1%
+
+Total: $3,480.63
 ```
 
 ## Take a Snapshot

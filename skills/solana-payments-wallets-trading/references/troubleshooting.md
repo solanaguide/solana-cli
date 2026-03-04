@@ -153,6 +153,5 @@ not affected.
 ## General Tips
 
 - Use `--verbose` on any command to see debug output
-- Use `--json` to get structured error messages with error codes
 - Check `sol config list` to verify your settings
 - Run `sol network` to verify RPC connectivity and see network status

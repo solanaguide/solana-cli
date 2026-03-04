@@ -1,17 +1,21 @@
 ---
 name: solana-payments-wallets-trading
 description: >-
-  Pay people in SOL or USDC, buy and sell tokens, check prices, manage Solana
-  wallets, stake SOL, earn yield through lending and managed vaults, provide
-  liquidity across multiple DEXes, trade prediction markets, pay for APIs via
-  x402, and track portfolio performance — all from the command line. No API
-  keys, no private key env vars. Use when the user wants to send crypto, trade,
-  check balances, earn yield, provide liquidity, bet on predictions, pay for
-  web resources, or see how their holdings are doing.
+  Pay people in SOL or USDC, buy and sell tokens, check prices, discover
+  trending and new tokens, create and manage Solana wallets, stake SOL, earn yield
+  through lending and managed vaults, borrow against collateral, set up
+  DCA (dollar-cost averaging) and limit orders, provide liquidity across
+  multiple DEXes, trade prediction markets, pay for APIs via x402, set up
+  security permissions and spending limits, and track portfolio performance
+  — all from the command line. No API keys, no private key env vars. Use
+  when the user wants to send crypto, swap or trade tokens, browse what's
+  trending, check balances, earn yield, borrow, set up recurring buys or
+  limit orders, provide liquidity, bet on predictions, pay for web
+  resources, or see how their holdings are doing.
 license: MIT
 metadata:
   author: solanaguide
-  version: 0.3.3
+  version: 0.3.4
   openclaw:
     requires:
       bins:
@@ -62,10 +66,6 @@ sol token send 50 usdc GkX...abc
 sol token send 2 sol 7nY...xyz
 sol token send 1000 bonk AgE...def --yes
 ```
-
-Use `--yes` to skip the confirmation prompt — useful for automated
-payments between agents or apps. Confirmations are also skipped
-automatically in `--json` mode.
 
 See references/trading-commands.md for the full send reference.
 
@@ -276,8 +276,8 @@ transfer and retries with the payment attached. The server submits
 the transaction — your wallet only partially signs.
 
 Use `--dry-run` to inspect the cost before paying. Use `--max` to
-set a spending cap. Output is pipe-friendly by default; use `--json`
-for the structured envelope.
+set a spending cap. Output is pipe-friendly by default (body on
+stdout, payment info on stderr).
 
 See references/fetch-commands.md for the full reference including
 curl flag mapping and JSON output format.
@@ -302,20 +302,18 @@ See references/portfolio-commands.md for snapshot management.
 
 ## Structured Output
 
-Every command supports `--json` for structured output. For most use
-cases the default human-readable output is easier to work with — use
-`--json` when chaining commands in automation pipelines or parsing
-results programmatically.
+Every command supports `--json` for structured output, but the
+default human-readable output is designed to be easy to read and
+interpret — both for humans and LLM agents. Use human-readable
+output unless you are scripting or chaining commands in an
+automation pipeline.
 
-In JSON mode, confirmations are skipped automatically.
+The human output uses formatted tables, signposts next actions,
+and shows full IDs and addresses so you can copy-paste them into
+follow-up commands. See each command reference for example output.
 
-```json
-{ "ok": true, "data": { ... }, "meta": { "elapsed_ms": 450 } }
-```
-
-Error codes are `UPPER_SNAKE_CASE` (e.g. `SWAP_FAILED`). Check the
-`ok` field before reading `data`.
-
+For programmatic use, `--json` returns a `CommandResult<T>` envelope:
+`{ "ok": true, "data": { ... }, "meta": { "elapsed_ms": 450 } }`.
 See references/json-output-format.md for the full schema.
 
 ## Other Useful Commands
@@ -441,7 +439,7 @@ sol config status              # human-readable security overview
 sol config status --json       # structured output for agents
 ```
 
-Shows the full security posture: all permissions and whether they're enabled, transaction limits with current 24h usage, address and token allowlists, whether settings are locked, and warnings about potential risks (e.g. no limits configured, public RPC in use). Agents should use `sol config status --json` to understand what they're allowed to do — not by reading `config.toml` directly.
+Shows the full security posture: all permissions and whether they're enabled, transaction limits with current 24h usage, address and token allowlists, whether settings are locked, and warnings about potential risks (e.g. no limits configured, public RPC in use). Agents should use `sol config status` to understand what they're allowed to do — not by reading `config.toml` directly.
 
 ### Important: Filesystem Access
 

@@ -28,26 +28,16 @@ sol predict list --limit 10               # limit results
 | `--filter <type>` | none | Filter: `new`, `live`, `trending`, `upcoming` |
 | `--limit <n>` | 20 | Number of results |
 
-### JSON Output
+### Example Output
 
-```json
-{
-  "ok": true,
-  "data": {
-    "category": "crypto",
-    "events": [
-      {
-        "id": "POLY-89525",
-        "title": "What price will Solana hit in 2026?",
-        "category": "crypto",
-        "markets": [ ... ],
-        "volume": 125000,
-        "status": "live"
-      }
-    ]
-  },
-  "meta": { "elapsed_ms": 500 }
-}
+```
+Event ID     Title                                              Category  Markets  Volume
+─────────────────────────────────────────────────────────────────────────────────────────
+POLY-89525   What price will Solana hit in 2026?                crypto          5  $125.0K
+POLY-91234   Will Bitcoin reach $200k in 2026?                  crypto          3  $89.2K
+POLY-88001   Champions League Winner 2026                       sports          8  $45.1K
+
+Showing 3 events. Run `sol predict event <id>` to see markets.
 ```
 
 ## Search Events
@@ -85,6 +75,21 @@ Shows an event and all its markets with YES/NO prices.
 sol predict event POLY-89525
 ```
 
+### Example Output
+
+```
+What price will Solana hit in 2026?
+Category: crypto | Volume: $125.0K | Status: live
+
+Market ID      Market         YES     NO   Volume  Status
+──────────────────────────────────────────────────────────────────
+POLY-701571    ↑ 200         $0.35  $0.65  $50.0K  live
+POLY-701572    ↑ 300         $0.15  $0.85  $32.1K  live
+POLY-701573    ↑ 500         $0.05  $0.95  $18.4K  live
+
+Run `sol predict buy <amount> yes|no <marketId>` to buy contracts.
+```
+
 ## View Market Details
 
 ```bash
@@ -100,28 +105,25 @@ and orderbook depth (top 10 levels).
 sol predict market POLY-701571
 ```
 
-### JSON Output
+### Example Output
 
-```json
-{
-  "ok": true,
-  "data": {
-    "market": {
-      "id": "POLY-701571",
-      "title": "↑ 200",
-      "yesPrice": 0.35,
-      "noPrice": 0.65,
-      "volume": 50000,
-      "status": "live",
-      "resolution": null
-    },
-    "orderbook": {
-      "yes": [{ "price": 0.35, "quantity": 150 }],
-      "no": [{ "price": 0.65, "quantity": 200 }]
-    }
-  },
-  "meta": { "elapsed_ms": 600 }
-}
+```
+↑ 200
+YES: $0.3500 | NO: $0.6500 | Volume: $50.0K
+Status: live
+
+YES Orderbook
+Price   Qty
+────────────
+ $0.35  150
+ $0.34  200
+ $0.33   80
+
+NO Orderbook
+Price   Qty
+────────────
+ $0.65  200
+ $0.66  120
 ```
 
 ## Buy Contracts
@@ -147,6 +149,17 @@ sol predict buy 5 yes POLY-701571 --wallet trading
 |------|---------|-------------|
 | `--max-price <price>` | none | Maximum price per contract (0–1) |
 | `--wallet <name>` | default | Wallet to use |
+
+### Example Output
+
+```
+Bought 14.28 YES contracts at $0.3500
+  Cost: $5.00 USDC
+  Position: 7gK3a2...def
+  Tx: https://solscan.io/tx/4xK9...abc
+
+Run `sol predict positions` to track your positions.
+```
 
 ### Permission
 
@@ -237,30 +250,13 @@ sol predict positions --wallet trading
 |------|---------|-------------|
 | `--wallet <name>` | default | Wallet to check |
 
-### JSON Output
+### Example Output
 
-```json
-{
-  "ok": true,
-  "data": {
-    "wallet": "main",
-    "positions": [
-      {
-        "pubkey": "7gK...abc",
-        "marketTitle": "↑ 200",
-        "eventTitle": "What price will Solana hit in 2026?",
-        "isYes": true,
-        "contracts": 14.28,
-        "costBasisUsd": 5.0,
-        "currentValueUsd": 5.71,
-        "unrealizedPnlUsd": 0.71,
-        "claimable": false,
-        "status": "open"
-      }
-    ]
-  },
-  "meta": { "elapsed_ms": 800 }
-}
+```
+Position     Market                                      Side  Contracts  Cost    Value   P&L      Status
+────────────────────────────────────────────────────────────────────────────────────────────────────────
+7gK3a2..abc  Solana hit in 2026? — ↑ 200                 YES      14.28  $5.00   $5.71   +$0.71   open
+9xK4b3..def  Bitcoin reach $200k? — YES                  YES       8.00  $10.00  $8.40   -$1.60   open
 ```
 
 Claimable positions are highlighted — run `sol predict claim` to

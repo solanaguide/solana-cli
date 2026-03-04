@@ -67,7 +67,7 @@ export function createTokenService(ctx: SolContext, registry: TokenRegistryServi
 
         if (!rawBalance || rawBalance === '0') continue;
 
-        let symbol = mint.slice(0, 6) + '...';
+        let symbol = mint;
         let name = 'Unknown Token';
         try {
           const meta = await registry.resolveToken(mint);
@@ -108,7 +108,7 @@ export function createTokenService(ctx: SolContext, registry: TokenRegistryServi
         const uiBalance = parsed.tokenAmount?.uiAmount as number ?? 0;
         const pubkey = String(account.pubkey);
 
-        let symbol = mint.slice(0, 6) + '...';
+        let symbol = mint;
         let name = 'Unknown Token';
         try {
           const meta = await registry.resolveToken(mint);

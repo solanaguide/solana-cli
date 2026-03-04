@@ -54,7 +54,7 @@ export async function getTokenBalances(walletAddress: string): Promise<TokenBala
       if (!rawBalance || rawBalance === '0') continue;
 
       // Resolve token metadata
-      let symbol = mint.slice(0, 6) + '...';
+      let symbol = mint;
       let name = 'Unknown Token';
       try {
         const meta = await resolveToken(mint);
@@ -108,7 +108,7 @@ export async function getAllTokenAccounts(walletAddress: string): Promise<TokenA
       const uiBalance = parsed.tokenAmount?.uiAmount as number ?? 0;
       const pubkey = String(account.pubkey);
 
-      let symbol = mint.slice(0, 6) + '...';
+      let symbol = mint;
       let name = 'Unknown Token';
       try {
         const meta = await resolveToken(mint);

@@ -50,36 +50,20 @@ arguments, shows the highest-TVL pools across all protocols.
 sol lp pools sol usdc                          # SOL/USDC pools across all protocols
 sol lp pools sol --protocol orca               # All SOL pools on Orca
 sol lp pools --sort apy --type clmm            # Highest APY CLMM pools
-sol lp pools sol usdc --json                   # Structured output
 ```
 
-### JSON Output
+### Example Output
 
-```json
-{
-  "ok": true,
-  "data": {
-    "tokenA": "sol",
-    "tokenB": "usdc",
-    "pools": [
-      {
-        "protocol": "orca",
-        "poolId": "HJPj...",
-        "tokenA": "SOL",
-        "tokenB": "USDC",
-        "poolType": "clmm",
-        "tvlUsd": 25000000,
-        "apy": 0.12,
-        "volume24hUsd": 8000000,
-        "feeRate": 0.0004,
-        "currentPrice": 150.25
-      }
-    ],
-    "warnings": []
-  },
-  "meta": { "elapsed_ms": 1200 }
-}
 ```
+Protocol  Pool ID                                       Pair       Type  TVL      APY     Volume 24h  Fee
+───────────────────────────────────────────────────────────────────────────────────────────────────────────
+orca      HJPjKft4yAhLf2ti4cMZY8E7ybSz2a3PSwKzTrP4pump  SOL/USDC   clmm  $25.0M  12.00%  $8.0M       0.04%
+raydium   9xK4b3deFGh1234567890abcdef1234567890abcdef12  SOL/USDC   clmm  $18.2M   9.50%  $5.2M       0.05%
+meteora   4bC7ghiJKL1234567890abcdef1234567890abcdef1234  SOL/USDC   dlmm  $12.1M  15.20%  $6.8M       0.03%
+```
+
+Full pool IDs are shown so you can copy-paste them into
+`sol lp deposit`, `sol lp info`, or other commands.
 
 ## Pool Info
 
@@ -130,7 +114,7 @@ discover valid values before running `sol lp create`.
 sol lp configs                              # all protocols
 sol lp configs --protocol raydium           # Raydium CLMM + CPMM configs
 sol lp configs --protocol meteora           # Meteora DLMM presets from on-chain
-sol lp configs --type clmm --json           # CLMM configs only, structured output
+sol lp configs --type clmm                  # CLMM configs only
 ```
 
 ## Positions
@@ -168,43 +152,6 @@ earning fees. The CLI suggests rebalancing:
 ```
 2 positions out of range (not earning fees).
   Consider rebalancing: sol lp withdraw <id> && sol lp deposit <pool> ...
-```
-
-### JSON Output
-
-```json
-{
-  "ok": true,
-  "data": {
-    "wallet": "main",
-    "protocol": "all",
-    "positions": [
-      {
-        "protocol": "orca",
-        "poolId": "HJPj...",
-        "positionId": "9xK...",
-        "tokenA": "SOL",
-        "tokenB": "USDC",
-        "poolType": "clmm",
-        "amountA": 5.2,
-        "amountB": 780.5,
-        "valueUsd": 1560.80,
-        "unclaimedFeesUsd": 12.35,
-        "lowerPrice": 120.0,
-        "upperPrice": 180.0,
-        "inRange": true,
-        "pnl": {
-          "depositValueUsd": 1500.00,
-          "ilUsd": -15.20,
-          "feesEarnedUsd": 42.35,
-          "netPnlUsd": 60.80,
-          "feeToIlRatio": 2.78
-        }
-      }
-    ]
-  },
-  "meta": { "elapsed_ms": 2000 }
-}
 ```
 
 ## Deposit
@@ -289,7 +236,6 @@ withdrawing liquidity.
 
 ```bash
 sol lp claim 9xK...abc                        # claim fees from position
-sol lp claim 9xK...abc --json                 # structured output
 ```
 
 ## Farm

@@ -31,32 +31,22 @@ one). The best deposit rate per token is marked with `*`.
 sol lend rates usdc                    # USDC rates across all protocols
 sol lend rates sol usdc                # SOL and USDC rates
 sol lend rates --protocol kamino       # Only Kamino rates
-sol lend rates usdc --protocol loopscale --json
 ```
 
-### JSON Output
+### Example Output
 
-```json
-{
-  "ok": true,
-  "data": {
-    "tokens": ["USDC"],
-    "protocol": "all",
-    "rates": [
-      {
-        "protocol": "kamino",
-        "token": "USDC",
-        "depositApy": 0.045,
-        "borrowApy": 0.082,
-        "totalDeposited": 150000000,
-        "utilizationPct": 63.3
-      }
-    ],
-    "bestDepositProtocol": { "USDC": "loopscale" },
-    "bestBorrowProtocol": { "USDC": "kamino" }
-  },
-  "meta": { "elapsed_ms": 800 }
-}
+```
+Lending Rates — USDC
+
+Protocol     Token  Deposit APY  Borrow APY  Utilization  Total Deposited
+──────────────────────────────────────────────────────────────────────────
+loopscale    USDC       8.50% *       6.00%       72.1%         $45.2M
+kamino       USDC       4.50%         8.20%       63.3%        $150.0M
+marginfi     USDC       3.80%         7.10%       58.9%         $82.5M
+drift        USDC       3.20%            —        45.2%         $30.1M
+jup-lend     USDC       2.90%            —        40.0%         $20.0M
+
+* = best rate. Run `sol lend deposit <amount> <token>` to start earning.
 ```
 
 ## Deposit
@@ -174,35 +164,17 @@ APY, USD value, and health factor (where available).
 
 The CLI warns when health factor drops below 1.1.
 
-### JSON Output
+### Example Output
 
-```json
-{
-  "ok": true,
-  "data": {
-    "wallet": "main",
-    "protocol": "all",
-    "positions": [
-      {
-        "protocol": "kamino",
-        "token": "USDC",
-        "type": "deposit",
-        "amount": 100,
-        "valueUsd": 100,
-        "apy": 0.045
-      },
-      {
-        "protocol": "loopscale",
-        "token": "USDC",
-        "type": "borrow",
-        "amount": 50,
-        "valueUsd": 50,
-        "apy": 0.06
-      }
-    ]
-  },
-  "meta": { "elapsed_ms": 1200 }
-}
+```
+Lending Positions — main
+
+Protocol    Token  Type      Amount      Value     APY
+─────────────────────────────────────────────────────────
+kamino      USDC   deposit   100.00      $100.00   4.50%
+loopscale   USDC   borrow    50.00       $50.00    6.00%
+
+Health factor: 2.50
 ```
 
 ## Health Factor

@@ -111,7 +111,7 @@ export function registerTokenCommand(program: Command): void {
               balances.map(b => ({
                 symbol: b.symbol,
                 balance: b.uiBalance.toFixed(6),
-                mint: b.mint.length > 20 ? b.mint.slice(0, 8) + '...' + b.mint.slice(-4) : b.mint,
+                mint: b.mint,
               })),
               [
                 { key: 'symbol', header: 'Token' },
@@ -181,23 +181,34 @@ export function registerTokenCommand(program: Command): void {
           if (entries.length === 0) {
             console.log('  No results.');
           } else {
+            const hasOrganic = entries.some(e => e.metadata?.organicScore != null);
+            const hasHolders = entries.some(e => e.metadata?.holderCount != null);
+
+            const columns = [
+              { key: 'rank', header: '#', align: 'right' as const },
+              { key: 'symbol', header: 'Symbol' },
+              { key: 'name', header: 'Name' },
+              { key: 'mint', header: 'Mint' },
+              { key: 'price', header: 'Price', align: 'right' as const },
+              { key: 'change24h', header: '24h', align: 'right' as const },
+              { key: 'volume', header: 'Volume 24h', align: 'right' as const },
+              ...(hasOrganic ? [{ key: 'organic', header: 'Organic', align: 'right' as const }] : []),
+              ...(hasHolders ? [{ key: 'holders', header: 'Holders', align: 'right' as const }] : []),
+            ];
+
             console.log(table(
               entries.map((e, i) => ({
                 rank: String(i + 1),
                 symbol: e.symbol || '???',
-                name: e.name.length > 24 ? e.name.slice(0, 22) + '..' : e.name,
+                name: e.name,
+                mint: e.mint,
                 price: e.priceUsd != null ? `$${fmtPrice(e.priceUsd)}` : '—',
                 change24h: e.change24hPct != null ? `${e.change24hPct >= 0 ? '+' : ''}${e.change24hPct.toFixed(1)}%` : '—',
                 volume: e.volume24hUsd != null ? fmtVolume(e.volume24hUsd) : '—',
+                organic: e.metadata?.organicScore != null ? `${Number(e.metadata.organicScore).toFixed(0)}%` : '—',
+                holders: e.metadata?.holderCount != null ? Number(e.metadata.holderCount).toLocaleString() : '—',
               })),
-              [
-                { key: 'rank', header: '#', align: 'right' },
-                { key: 'symbol', header: 'Symbol' },
-                { key: 'name', header: 'Name' },
-                { key: 'price', header: 'Price', align: 'right' },
-                { key: 'change24h', header: '24h', align: 'right' },
-                { key: 'volume', header: 'Volume 24h', align: 'right' },
-              ]
+              columns,
             ));
           }
           console.log(`\nRun \`sol token info <symbol>\` for details, or \`sol token swap <amount> <from> <to>\` to trade.`);
